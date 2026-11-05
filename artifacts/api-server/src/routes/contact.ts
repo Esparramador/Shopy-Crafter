@@ -3,7 +3,13 @@ import { renderHtmlOrText } from "../lib/html-escape.js";
 import { db, auditLogTable } from "@workspace/db";
 import { projectFilesTable } from "@workspace/db/schema";
 import { eq, desc, isNull, and } from "drizzle-orm";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import {
+  claimContactSubmission,
+  isValidContactIdempotencyKey,
+  IDEMPOTENCY_KEY_REUSED,
+  type ContactSubmissionRecord,
+} from "../lib/contact-idempotency.js";
 import multer from "multer";
 import { getKlaviyoHeaders } from "../lib/klaviyo-headers.js";
 import { sendEmail, isGmailAvailable } from "../lib/gmail.js";
@@ -1394,6 +1400,11 @@ async function buildReportHtml(
 router.post("/contact", contactUpload.single("referenceImage"), async (req, res): Promise<void> => {
   enableLongRunning(res);
   try {
+    const suppliedKey = req.get("Idempotency-Key");
+    if (suppliedKey !== undefined && !isValidContactIdempotencyKey(suppliedKey)) {
+      res.status(400).json({ error: "Clave de solicitud no válida" });
+      return;
+    }
     const body = req.body ?? {};
     const {
       name, email, phone, storeUrl, niche, customNiche, revenue,
@@ -1416,12 +1427,6 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
     if (uploadedFile) {
       const b64 = uploadedFile.buffer.toString("base64");
       resolvedImageUrl = `data:${uploadedFile.mimetype};base64,${b64}`;
-    }
-  
-    const ip = req.ip ?? "unknown";
-    if (!checkContactRateLimit(ip)) {
-      res.status(429).json({ error: "Demasiadas solicitudes. Inténtalo de nuevo más tarde." });
-      return;
     }
   
     if (!name?.trim() || !email?.trim()) {
@@ -1451,15 +1456,51 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
       suppliers: suppliers?.trim() ?? null,
       submittedAt: new Date().toISOString(),
     };
-  
-    await db.insert(auditLogTable).values({
-      id: randomBytes(8).toString("hex"),
-      userId: "public",
-      action: "lead_form_submitted",
-      details: JSON.stringify(leadData),
-      ipAddress: req.ip ?? "unknown",
-    }).catch(() => {});
-  
+
+    const claim = await claimContactSubmission(
+      suppliedKey ?? randomUUID(),
+      leadData,
+      {
+        find: async id => {
+          const [existing] = await db.select({
+            action: auditLogTable.action,
+            details: auditLogTable.details,
+          }).from(auditLogTable).where(eq(auditLogTable.id, id)).limit(1);
+          return existing as ContactSubmissionRecord | undefined;
+        },
+        insert: async record => {
+          const inserted = await db.insert(auditLogTable).values({
+            id: record.id,
+            userId: "public",
+            action: record.action,
+            details: record.details,
+            ipAddress: req.ip ?? "unknown",
+          }).onConflictDoNothing().returning({ id: auditLogTable.id });
+          return inserted.length > 0;
+        },
+      },
+      () => checkContactRateLimit(req.ip ?? "unknown"),
+    );
+
+    if (claim === "rate_limited") {
+      res.status(429).json({ error: "Demasiadas solicitudes. Inténtalo de nuevo más tarde." });
+      return;
+    }
+    if (claim === "key_reused") {
+      res.status(409).json({
+        code: IDEMPOTENCY_KEY_REUSED,
+        error: "La clave ya se usó para otra solicitud.",
+      });
+      return;
+    }
+    if (claim === "duplicate") {
+      res.json({
+        success: true,
+        message: "¡Solicitud recibida! Estamos analizando tu negocio con IA. Recibirás noticias nuestras muy pronto.",
+      });
+      return;
+    }
+
     res.json({ success: true, message: "¡Solicitud recibida! Estamos analizando tu negocio con IA. Recibirás noticias nuestras muy pronto." });
   
     (async () => {

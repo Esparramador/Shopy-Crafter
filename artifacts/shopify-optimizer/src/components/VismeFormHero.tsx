@@ -196,13 +196,13 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
         Object.entries(form).forEach(([k, v]) => fd.append(k, v));
         fd.append("services", JSON.stringify(services));
         fd.append("referenceImage", refFile);
-        await sendContactRequest(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
+        await sendContactRequest(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd }, "public-contact");
       } else {
         await sendContactRequest(`${BASE_URL}/api/contact`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...form, services }),
-        });
+        }, "public-contact");
       }
       setStatus("sent");
     } catch (err: unknown) {

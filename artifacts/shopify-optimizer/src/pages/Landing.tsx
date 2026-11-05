@@ -275,14 +275,14 @@ export default function Landing() {
         Object.entries(contactForm).forEach(([k, v]) => fd.append(k, v));
         fd.append("services", JSON.stringify(contactServices));
         fd.append("referenceImage", refImageFile);
-        await sendContactRequest(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
+        await sendContactRequest(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd }, "public-contact");
       } else {
         await sendContactRequest(`${BASE_URL}/api/contact`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...contactForm, services: contactServices }),
-        });
+        }, "public-contact");
       }
       setContactStatus("sent");
     } catch (err: unknown) {

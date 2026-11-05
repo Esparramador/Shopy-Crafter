@@ -497,7 +497,7 @@ export default function Contacto() {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, services }),
-      });
+      }, "public-contact");
       setStatus("sent");
     } catch (err: unknown) {
       setStatus("error");
