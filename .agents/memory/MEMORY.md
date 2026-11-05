@@ -1,3 +1,4 @@
+- [WooCommerce: tienda real](woocommerce-real-store.md) — Muscle Factory es una tienda conectada real, no un entorno de pruebas; las comprobaciones no deben alterar sus datos comerciales.
 - [3D Web Effects Library](3d-web-effects-library.md) — 28 templates en master-prompt-library.json key=3d_web_effects; 8 repos GitHub analizados (Batch 1: 01-12, Batch 2: 13-28 de Suburbia/Noova/Medical/Ferrari); skill en .agents/skills/3d-web-effects/SKILL.md.
 - [Grok Aurora I2V pipeline](grok-i2v-pipeline.md) — I2V only (no T2V); aurora image not available; "done" = success; 22 min timeout; node -e has no XAI_API_KEY; recovery via disk check + stored request_id.
 - [Drizzle sql TEXT[] array fix](drizzle-sql-array-fix.md) — passing JS array directly to sql`` expands as tuple; sql.array() missing; use `\`{${arr.join(",")}}\`` literal instead.
