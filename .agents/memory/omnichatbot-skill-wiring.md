@@ -14,3 +14,7 @@ Five distinct "skill" sources exist; only some are wired into the conversational
 **Why this matters:** the public/unauthenticated landing chatbot route is a SEPARATE route from the authenticated in-app chatbot route. As of the `.agents/skills` wiring, BOTH routes now reference the same catalog, but with different privilege levels (knowledge-only vs. real execution) — verify which route + which capability level the user means.
 
 **How to apply:** when asked "does the chatbot really know/execute skill X," check (a) is it injected as static text into a system prompt (knowledge only), (b) is it callable as a real action/function that reads real data (execution), or (c) is it only exposed via a separate API route nothing calls (dormant). All three states can coexist across different catalogs in this codebase.
+
+**User-approved boundary (2026-11-06):** Keep the landing advisor and admin ShopyBrain as separate chat experiences. Public visitors receive advice only; privileged platform actions remain admin-only and sensitive actions require confirmation.
+**Why:** The project owner explicitly chose differentiated chats, and ShopyBrain can perform real operations on connected services.
+**How to apply:** Preserve this boundary in chat UI, routing, API authorization, and tests; never expose admin tools to the public widget or remove confirmations to satisfy a request for broad access.
