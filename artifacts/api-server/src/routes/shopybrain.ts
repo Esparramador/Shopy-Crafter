@@ -2229,7 +2229,8 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
       ]);
   
       const r = result as Record<string, unknown>;
-      if (!r.error && !NON_LEARNABLE.has(action)) {
+      const operationSucceeded = !r.error && r.success !== false;
+      if (operationSucceeded && !NON_LEARNABLE.has(action)) {
         const safeParams = redactParams(params);
         const enrichedContent = buildEnrichedLearningContent(action, safeParams, r);
         learnFromOperation({
@@ -2252,7 +2253,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
       ]);
       const isSaveable = !NON_SAVEABLE.has(action);
       const pId = params?.projectId ? parseInt(params.projectId) : null;
-      if (pId && isSaveable && !r.error) {
+      if (pId && isSaveable && operationSucceeded) {
         const content = JSON.stringify(result, null, 2);
         saveToVault({
           projectId: pId,
@@ -2268,7 +2269,7 @@ router.post("/shopybrain/execute-action", requireAdmin, async (req, res): Promis
         }).catch(() => {});
       }
   
-      res.json({ success: true, action, ...result });
+      res.json({ action, ...result, success: operationSucceeded });
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : String(e);
       const safeLogParams = params ? Object.fromEntries(

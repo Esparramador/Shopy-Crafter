@@ -1848,7 +1848,9 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
         `⚠️ Confirmación requerida para \`${action}\`. Re-envía la acción añadiendo "confirma" al mensaje.`
       );
     }
-    if (result.error) return `❌ ${typeof result.error === "string" ? result.error : (result.message || result.error?.message || "Error inesperado")}`;
+    if (result?.cancelled === true) return `ℹ️ ${result.message || "Acción cancelada: no se han realizado cambios."}`;
+    if (result?.error) return `❌ ${typeof result.error === "string" ? result.error : (result.message || result.error?.message || "Error inesperado")}`;
+    if (result?.success === false) return `❌ ${result.message || "La acción no se completó. Revisa el estado y vuelve a intentarlo."}`;
 
     switch (action) {
       case "store_status":

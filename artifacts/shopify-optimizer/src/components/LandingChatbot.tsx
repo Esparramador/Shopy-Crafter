@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Loader2, Sparkles, ChevronDown, Phone } from "lucide-react";
+import { readLandingChatStream } from "@/lib/landing-chat-stream";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -7,6 +8,8 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  retryText?: string;
+  retryHistory?: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
@@ -60,84 +63,83 @@ export default function LandingChatbot() {
     return () => clearTimeout(t);
   }, []);
 
-  const send = async (text?: string) => {
+  const send = async (
+    text?: string,
+    retryBotId?: string,
+    retryHistory?: Array<{ role: "user" | "assistant"; content: string }>,
+  ) => {
     const content = (text ?? input).trim();
     if (!content || loading) return;
 
     const userMsg: Message = { id: uuid(), role: "user", content };
-    const botId = uuid();
-    const botMsg: Message = { id: botId, role: "assistant", content: "" };
+    const botId = retryBotId ?? uuid();
+    const botMsg: Message = { id: botId, role: "assistant", content: "…" };
 
-    setMessages(m => [...m, userMsg, botMsg]);
+    if (retryBotId) {
+      setMessages(m => m.map(msg => msg.id === retryBotId ? botMsg : msg));
+    } else {
+      setMessages(m => [...m, userMsg, botMsg]);
+    }
     setInput("");
     setShowSuggestions(false);
     setLoading(true);
 
-    const history = [...messages, userMsg]
+    const history = retryHistory ?? (retryBotId ? messages.filter(m => m.id !== retryBotId) : [...messages, userMsg])
       .filter(m => m.id !== "welcome")
       .map(m => ({ role: m.role, content: m.content }));
 
+    let completedReply = "";
     try {
-      const res = await fetch(`${API}/api/public/landing-chat/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
-      });
-
-      if (!res.ok || !res.body) throw new Error("stream_failed");
-
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      let acc = "";
-      let streamErrored = false;
-
-      outer: while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const parts = buf.split("\n\n");
-        buf = parts.pop() ?? "";
-        for (const part of parts) {
-          if (!part.startsWith("data: ")) continue;
-          try {
-            const d = JSON.parse(part.slice(6));
-            if (d.error) { streamErrored = true; break outer; }
-            if (d.text) {
-              acc += d.text;
-              setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: acc } : msg));
-            }
-            if (d.done) break outer;
-          } catch {}
-        }
-      }
-
-      if (streamErrored && !acc) {
-        // No partial content was shown yet — retry via the non-streaming endpoint
-        // (which has its own Claude fallback), instead of leaving a blank bubble.
-        throw new Error("stream_error");
-      }
-
-      if (!acc) {
-        setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: "No pude generar una respuesta. Inténtalo de nuevo." } : msg));
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90_000);
+      try {
+        const res = await fetch(`${API}/api/public/landing-chat/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: history }),
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) throw new Error("stream_unavailable");
+        const stream = await readLandingChatStream(res.body, (partial) => {
+          setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: partial } : msg));
+        });
+        if (stream.complete && stream.content.trim()) completedReply = stream.content.trim();
+      } finally {
+        clearTimeout(timeout);
       }
     } catch {
-      // Fallback: try JSON endpoint
-      try {
-        const history2 = [...messages, userMsg].filter(m => m.id !== "welcome").map(m => ({ role: m.role, content: m.content }));
-        const r2 = await fetch(`${API}/api/public/landing-chat`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: history2 }),
-        });
-        const data = await r2.json();
-        const reply = data.content || data.error || "Error de conexión. Inténtalo de nuevo.";
-        setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: reply } : msg));
-      } catch {
-        setMessages(m => m.map(msg => msg.id === botId ? { ...msg, content: "Error de conexión. Inténtalo de nuevo." } : msg));
-      }
-    } finally {
-      setLoading(false);
+      // An incomplete or failed stream is replaced by a full JSON response below.
     }
+
+    if (!completedReply) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90_000);
+      try {
+        const response = await fetch(`${API}/api/public/landing-chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: history }),
+          signal: controller.signal,
+        });
+        const data = await response.json().catch(() => null) as { content?: unknown; error?: unknown } | null;
+        if (response.ok && typeof data?.content === "string" && data.content.trim()) {
+          completedReply = data.content.trim();
+        } else if (response.status === 429 && typeof data?.error === "string") {
+          completedReply = data.error;
+        }
+      } catch {
+        // Keep the interaction recoverable with the retry button.
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    setMessages(m => m.map(msg => msg.id === botId
+      ? completedReply
+        ? { ...msg, content: completedReply, retryText: undefined, retryHistory: undefined }
+        : { ...msg, content: "No pude completar la respuesta. Comprueba tu conexión y vuelve a intentarlo.", retryText: content, retryHistory: history }
+      : msg));
+    setLoading(false);
   };
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -198,7 +200,7 @@ export default function LandingChatbot() {
             <div style={{ fontSize: 13, fontWeight: 700, color: "#f0e8cc", letterSpacing: "0.01em" }}>Asesor Shopy Crafter</div>
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 1 }}>
               <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: "#2dd49f", flexShrink: 0, boxShadow: "0 0 6px rgba(45,212,159,0.6)" }} />
-              <span style={{ fontSize: 10, color: "rgba(240,232,204,0.6)" }}>Disponible ahora · responde al instante</span>
+              <span style={{ fontSize: 10, color: "rgba(240,232,204,0.6)" }}>Asesor virtual · puede tardar unos segundos</span>
             </div>
           </div>
           <button onClick={() => setVoiceOpen(true)} aria-label="Llamada con IA" title="Hablar con el asistente de voz" style={{
@@ -282,7 +284,25 @@ export default function LandingChatbot() {
                       }} />
                     ))}
                   </div>
-                ) : formatText(msg.content)}
+                ) : (
+                  <>
+                    {formatText(msg.content)}
+                    {msg.retryText && !loading && (
+                      <button
+                        type="button"
+                        onClick={() => void send(msg.retryText, msg.id, msg.retryHistory)}
+                        style={{
+                          display: "block", marginTop: 8, padding: "6px 10px",
+                          borderRadius: 8, border: "1px solid rgba(200,168,75,0.35)",
+                          background: "rgba(200,168,75,0.1)", color: "#f0e8cc",
+                          fontSize: 11, cursor: "pointer",
+                        }}
+                      >
+                        Reintentar
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -545,7 +565,7 @@ function LandingVoiceModal({ onClose }: { onClose: () => void }) {
           <span style={{ fontSize: 20 }}>💬</span>
           <div style={{ textAlign: "left" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#c8a84b", marginBottom: 2 }}>Mientras tanto, usa el chat</div>
-            <div style={{ fontSize: 11, color: "rgba(240,232,204,0.5)" }}>Nuestro chatbot IA responde al instante, 24/7</div>
+            <div style={{ fontSize: 11, color: "rgba(240,232,204,0.5)" }}>La respuesta depende de la disponibilidad del servicio de IA</div>
           </div>
         </div>
         <button

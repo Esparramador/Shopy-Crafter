@@ -132,6 +132,37 @@ export async function fetchImageWithSizeLimit(
 // ─── CRIT-6: confirmación destructiva ───────────────────────────────────────
 
 export const DESTRUCTIVE_ACTIONS = new Set<string>([
+  // Writes to connected stores and external business systems require an explicit
+  // click in the authenticated admin UI, not a confirmation emitted by the model.
+  "create_product",
+  "edit_product",
+  "change_price",
+  "set_product_status",
+  "publish_product",
+  "create_collection",
+  "add_to_collection",
+  "edit_collection",
+  "remove_from_collection",
+  "update_stock",
+  "bulk_update_stock",
+  "update_product_price",
+  "bulk_update_prices",
+  "add_variant",
+  "edit_variant",
+  "create_page",
+  "update_page",
+  "optimize_product",
+  "redesign_product",
+  "apply_redesign",
+  "generate_all_metas",
+  "fix_all_alt_texts",
+  "generate_schemas",
+  "generate_competitive_pricing",
+  "create_ab_test",
+  "declare_winner",
+  "optimize_images",
+  "bulk_generate_images",
+  "create_user",
   "delete_product",
   "delete_collection",
   "delete_variant",
@@ -146,8 +177,6 @@ export const DESTRUCTIVE_ACTIONS = new Set<string>([
   "sync_catalog_prices",
   "optimize_all_products",
   "bulk_redesign",
-  "bulk_update_prices",
-  "bulk_update_stock",
   "auto_collections",
   "design_all_pages",
   "setup_full_store",
@@ -158,13 +187,22 @@ export const DESTRUCTIVE_ACTIONS = new Set<string>([
   "edit_theme_settings",
   "create_theme_section",
   "sync_store_theme",
-  // Mueven dinero o escriben a clientes reales
+  "update_cms",
+  "update_cms_batch",
+  "platform_create_product",
+  "platform_edit_product",
+  "platform_delete_product",
+  "platform_update_stock",
+  "platform_update_seo",
+  "stripe_create_product",
+  "stripe_create_customer",
+  "stripe_create_invoice",
   "stripe_create_charge",
   "stripe_create_refund",
-  "stripe_cancel_subscription",
   "stripe_send_invoice",
+  "stripe_cancel_subscription",
+  // Mueven dinero o escriben a clientes reales
   "send_restock_email",
-  "platform_delete_product",
 ]);
 
 export interface ConfirmationPreview {
@@ -235,7 +273,7 @@ export function requireConfirmation(
       `⚠️ **Confirmación requerida para \`${action}\`**\n\n` +
       `${preview.summary}\n` +
       (preview.estimatedCost ? `\n💰 **Coste:** ${preview.estimatedCost}\n` : "") +
-      `\nConfírmalo en el aviso del panel para aplicarlo.`,
+      `\nEsta acción puede cambiar datos de la tienda o de sistemas externos, afectar pagos o ser difícil de deshacer.\nConfírmalo en el aviso del panel para aplicarla.`,
   };
 }
 

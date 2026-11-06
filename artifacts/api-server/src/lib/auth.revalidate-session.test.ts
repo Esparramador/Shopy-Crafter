@@ -114,3 +114,23 @@ describe("revalidateSession", () => {
     expect(res.statusCode).toBe(500);
   });
 });
+
+describe("requireAdmin para acciones privadas de ShopyBrain", () => {
+  it("rechaza visitantes y sesiones de cliente", () => {
+    for (const session of [{}, { userId: "client-1", role: "client" }]) {
+      const res = makeRes();
+      const next = vi.fn();
+      requireAdmin(makeReq(session) as any, res as any, next);
+      expect(res.statusCode).toBe(403);
+      expect(next).not.toHaveBeenCalled();
+    }
+  });
+
+  it("solo deja continuar a la sesión admin", () => {
+    const res = makeRes();
+    const next = vi.fn();
+    requireAdmin(makeReq({ userId: "admin-1", role: "admin" }) as any, res as any, next);
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.statusCode).toBe(200);
+  });
+});
