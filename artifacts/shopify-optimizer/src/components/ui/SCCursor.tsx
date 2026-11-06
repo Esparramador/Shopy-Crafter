@@ -10,9 +10,17 @@ export default function SCCursor() {
     const root = document.documentElement;
     let raf = 0;
     let animating = false;
+    let cursorVisible = false;
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    let prefersReducedMotion = reducedMotion?.matches ?? false;
 
     const isInteractive = (target: EventTarget | null) =>
       target instanceof Element && Boolean(target.closest("a, button, [role='button'], input, select, textarea, label"));
+
+    const clearHover = () => {
+      dotRef.current?.classList.remove("sc-cursor-hover");
+      ringRef.current?.classList.remove("sc-ring-hover");
+    };
 
     const onOver = (e: PointerEvent) => {
       if (isInteractive(e.target)) {
@@ -21,9 +29,12 @@ export default function SCCursor() {
       }
     };
     const onOut = (e: PointerEvent) => {
+      if (!e.relatedTarget) {
+        hideCursor();
+        return;
+      }
       if (isInteractive(e.relatedTarget)) return;
-      dotRef.current?.classList.remove("sc-cursor-hover");
-      ringRef.current?.classList.remove("sc-ring-hover");
+      clearHover();
     };
     const anim = () => {
       if (!animating) return;
@@ -45,19 +56,36 @@ export default function SCCursor() {
     };
 
     const hideCursor = () => {
+      cursorVisible = false;
       root.classList.remove("sc-cursor-on");
       dotRef.current?.classList.remove("sc-cursor-visible", "sc-cursor-hover");
       ringRef.current?.classList.remove("sc-cursor-visible", "sc-ring-hover");
       stopAnimation();
+      mx.current = my.current = rx.current = ry.current = 0;
+      if (dotRef.current) dotRef.current.style.transform = "";
+      if (ringRef.current) ringRef.current.style.transform = "";
     };
 
     const move = (e: PointerEvent) => {
-      if (e.pointerType === "touch") {
+      if (e.pointerType === "touch" || prefersReducedMotion) {
         hideCursor();
         return;
       }
       mx.current = e.clientX;
       my.current = e.clientY;
+      if (!cursorVisible) {
+        // Start the dot and ring at the actual pointer position. In particular,
+        // never lerp the ring from its default (0, 0) position on first entry.
+        rx.current = e.clientX;
+        ry.current = e.clientY;
+        if (dotRef.current) {
+          dotRef.current.style.transform = `translate3d(${e.clientX - 14}px, ${e.clientY - 14}px, 0)`;
+        }
+        if (ringRef.current) {
+          ringRef.current.style.transform = `translate3d(${e.clientX - 22}px, ${e.clientY - 22}px, 0)`;
+        }
+        cursorVisible = true;
+      }
       root.classList.add("sc-cursor-on");
       dotRef.current?.classList.add("sc-cursor-visible");
       ringRef.current?.classList.add("sc-cursor-visible");
@@ -70,17 +98,38 @@ export default function SCCursor() {
     const onWindowBlur = () => {
       hideCursor();
     };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") hideCursor();
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === "touch") {
+        clearHover();
+        hideCursor();
+      }
+    };
+    const onReducedMotionChange = (e: MediaQueryListEvent) => {
+      prefersReducedMotion = e.matches;
+      if (prefersReducedMotion) hideCursor();
+    };
 
     document.addEventListener("pointermove", move, { passive: true });
     document.addEventListener("pointerover", onOver);
     document.addEventListener("pointerout", onOut);
+    document.addEventListener("pointerdown", onPointerDown, { passive: true });
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pointerleave", hideCursor);
     window.addEventListener("blur", onWindowBlur);
+    reducedMotion?.addEventListener("change", onReducedMotionChange);
 
     return () => {
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerover", onOver);
       document.removeEventListener("pointerout", onOut);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pointerleave", hideCursor);
       window.removeEventListener("blur", onWindowBlur);
+      reducedMotion?.removeEventListener("change", onReducedMotionChange);
       hideCursor();
     };
   }, []);

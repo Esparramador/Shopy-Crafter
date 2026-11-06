@@ -17,7 +17,7 @@
   mix-blend-mode: screen; will-change: transform; transition: opacity .2s ease;
 }
 .fp-cursor-glow.is-visible { opacity: 1; }
-@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce) {
   .fp-cursor-glow { display: none; }
 }
 

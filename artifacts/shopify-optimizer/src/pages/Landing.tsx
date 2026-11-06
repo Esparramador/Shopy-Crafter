@@ -235,19 +235,49 @@ export default function Landing() {
 
   useEffect(() => {
     const el = cursorGlowRef.current;
-    if (!el || window.matchMedia("(hover: none), (pointer: coarse), (prefers-reduced-motion: reduce)").matches) return;
-    const move = (e: MouseEvent) => {
+    if (!el) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let prefersReducedMotion = reducedMotion.matches;
+    const hide = () => el.classList.remove("is-visible");
+    const move = (e: PointerEvent) => {
+      if (e.pointerType === "touch" || prefersReducedMotion) {
+        hide();
+        return;
+      }
       el.style.setProperty("--cursor-x", `${e.clientX}px`);
       el.style.setProperty("--cursor-y", `${e.clientY}px`);
       el.classList.add("is-visible");
     };
-    const leave = () => el.classList.remove("is-visible");
-    window.addEventListener("mousemove", move, { passive: true });
-    document.addEventListener("mouseleave", leave);
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === "touch") hide();
+    };
+    const onReducedMotionChange = (e: MediaQueryListEvent) => {
+      prefersReducedMotion = e.matches;
+      if (prefersReducedMotion) hide();
+    };
+    const onPointerOut = (e: PointerEvent) => {
+      if (!e.relatedTarget) hide();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") hide();
+    };
+
+    window.addEventListener("pointermove", move, { passive: true });
+    document.addEventListener("pointerdown", onPointerDown, { passive: true });
+    document.addEventListener("pointerout", onPointerOut);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pointerleave", hide);
+    window.addEventListener("blur", hide);
+    reducedMotion.addEventListener("change", onReducedMotionChange);
     return () => {
-      window.removeEventListener("mousemove", move);
-      document.removeEventListener("mouseleave", leave);
-      el.classList.remove("is-visible");
+      window.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("pointerout", onPointerOut);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pointerleave", hide);
+      window.removeEventListener("blur", hide);
+      reducedMotion.removeEventListener("change", onReducedMotionChange);
+      hide();
     };
   }, []);
 
