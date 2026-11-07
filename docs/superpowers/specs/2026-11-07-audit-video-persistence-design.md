@@ -3,10 +3,10 @@
 ## What & Why
 El botón «Vídeo anuncio» de Auditoría puede mostrar éxito aunque el vídeo no se haya guardado en el Vault del proyecto. El flujo cinematográfico continúa después de un error o un resultado vacío de `saveToVault`, y el modal acepta cualquier respuesta HTTP exitosa como un anuncio listo. El flujo rápido guarda el MP4, pero no devuelve el ID de Vault de forma uniforme. La base de desarrollo no muestra un anuncio reciente de esta generación.
 
-El objetivo es que un anuncio solo se anuncie como guardado cuando exista una copia recuperable y accesible desde el proyecto. Si falla la persistencia, el modal debe explicar que no se guardó y mantener una vía para descargar o reintentar el guardado sin volver a generar el vídeo.
+El objetivo es que un anuncio solo se anuncie como guardado cuando exista una copia duradera y accesible desde el proyecto: contenido en PostgreSQL o un objeto persistido en App Storage. Una ruta temporal de respaldo en disco no basta para confirmar que quedó guardado. Si falla la persistencia, el modal debe explicar que no se guardó y mantener una copia descargable sin volver a generar el vídeo.
 
 ## Done looks like
-- Los flujos rápido, cinematográfico y Try-On devuelven `success: true` únicamente después de confirmar que el MP4 tiene contenido o una ruta recuperable en el Vault.
+- Los flujos rápido, cinematográfico y Try-On devuelven `success: true` únicamente después de confirmar contenido en PostgreSQL o un objeto persistido en App Storage.
 - Las respuestas incluyen el ID del archivo de Vault y una URL estable de previsualización o descarga.
 - El modal no muestra un estado verde de éxito cuando faltan el ID o el enlace de recuperación.
 - Si falla el guardado después de generar el vídeo, el modal conserva una copia descargable y explica que no quedó guardada; no vuelve a llamar a los proveedores de generación.
@@ -21,7 +21,7 @@ El objetivo es que un anuncio solo se anuncie como guardado cuando exista una co
 1. **Confirmar persistencia del MP4** — Usar el Vault existente y comprobar que el registro contiene bytes o una ruta de almacenamiento recuperable; un registro de metadatos vacío no cuenta como guardado.
 2. **Corregir el contrato del API** — Devolver ID y URL de Vault en todos los flujos de anuncios; devolver un fallo explícito si la persistencia no se confirma.
 3. **Preservar el resultado generado** — Si el guardado falla, devolver el MP4 al modal como archivo descargable y mostrar un estado de fallo de persistencia; no volver a generar ni a cobrar.
-4. **Verificar ambos extremos** — Añadir pruebas aisladas de API y de la respuesta del modal para los escenarios de éxito, fallo de persistencia y reintento.
+4. **Verificar ambos extremos** — Añadir pruebas aisladas de API y de la respuesta del modal para los escenarios de guardado correcto, ficha sin bytes y fallo de persistencia con descarga de respaldo.
 
 ## Relevant files
 - `artifacts/shopify-optimizer/src/pages/projects/Audit.tsx:1790-1810`
