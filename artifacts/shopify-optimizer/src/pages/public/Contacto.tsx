@@ -580,7 +580,7 @@ export default function Contacto() {
 
               ) : status === "sent" ? (
                 /* ── SUCCESS ── */
-                <div style={{ textAlign:"center", padding:"40px 20px" }}>
+                <div role="status" data-testid="contact-success" style={{ textAlign:"center", padding:"40px 20px" }}>
                   <div style={{ fontSize:52, marginBottom:18 }}>✅</div>
                   <h3 style={{ fontSize:24, fontWeight:800, color:"#2dd49f", marginBottom:12 }}>¡Solicitud recibida!</h3>
                   <p style={{ color:"#888", fontSize:14, lineHeight:1.7, marginBottom:8 }}>
@@ -765,7 +765,7 @@ export default function Contacto() {
 
                     {/* Error */}
                     {status === "error" && !demoActive && (
-                      <div className="ctc-field" style={{
+                      <div className="ctc-field" role="alert" data-testid="contact-error" style={{
                         padding:"11px 15px", background:"rgba(232,69,88,.08)",
                         border:"1px solid rgba(232,69,88,.25)", borderRadius:10, color:"#e84558", fontSize:13,
                       }}>{error}</div>
