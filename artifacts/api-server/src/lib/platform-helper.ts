@@ -5,8 +5,11 @@ import { logger } from "./logger.js";
 
 const connectorCache = new Map<number, { connector: IPlatformConnector; ts: number }>();
 const CACHE_TTL = 60_000;
+/** Último motivo por el que no se pudo construir el conector (credenciales, HTTPS…), para no esconderlo. */
+const connectorErrors = new Map<number, string>();
 
 export async function getProjectConnector(projectId: number): Promise<IPlatformConnector | null> {
+  connectorErrors.delete(projectId);
   const cached = connectorCache.get(projectId);
   if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.connector;
 
@@ -47,6 +50,7 @@ export async function getProjectConnector(projectId: number): Promise<IPlatformC
     return connector;
   } catch (err) {
     logger.error({ err, projectId }, "Failed to get platform connector");
+    if (err instanceof Error && err.message) connectorErrors.set(projectId, err.message);
     return null;
   }
 }
@@ -69,9 +73,14 @@ export async function withPlatform<T>(
   fn: (connector: IPlatformConnector) => Promise<T>
 ): Promise<{ ok: true; data: T } | { ok: false; error: string; code: string }> {
   const connector = await getProjectConnector(projectId);
-  if (!connector) return { ok: false, error: "Proyecto no encontrado o plataforma no configurada", code: "NO_CONNECTOR" };
+  if (!connector) {
+    const reason = connectorErrors.get(projectId);
+    return { ok: false, error: reason ? `No se pudo abrir la conexión con la tienda: ${reason}` : "Proyecto no encontrado o plataforma no configurada", code: "NO_CONNECTOR" };
+  }
   if (!connector.supportsFeature(feature)) {
-    return { ok: false, error: `${connector.platformType} no soporta "${feature}". Funciones disponibles: productos, SEO, pedidos.`, code: "FEATURE_NOT_SUPPORTED" };
+    const all: PlatformFeature[] = ["products", "product_create", "product_update", "product_delete", "variants", "images", "image_upload_url", "image_upload_file", "seo_read", "seo_write", "orders", "inventory", "customers", "themes", "graphql", "audit"];
+    const available = all.filter(f => connector.supportsFeature(f)).join(", ");
+    return { ok: false, error: `${connector.platformType} no soporta "${feature}". Funciones disponibles: ${available || "ninguna"}.`, code: "FEATURE_NOT_SUPPORTED" };
   }
   try {
     const data = await fn(connector);

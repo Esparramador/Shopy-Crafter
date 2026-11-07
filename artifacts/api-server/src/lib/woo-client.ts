@@ -2,7 +2,23 @@ import type { Project } from "@workspace/db";
 import { safeDecrypt } from "./crypto.js";
 
 export class WooError extends Error {
-  constructor(message: string, public status = 502) { super(message); }
+  /** `status` es lo que responde NUESTRA API; `upstreamStatus`, lo que respondió la tienda (si respondió). */
+  constructor(message: string, public status = 502, public upstreamStatus?: number, public upstreamCode?: string) { super(message); }
+}
+
+/**
+ * Mensaje legible para un rechazo de la API REST de WooCommerce. Solo se usa el
+ * `code` del error de WordPress (p. ej. `woocommerce_rest_cannot_view`) y los nombres de
+ * parámetros inválidos: nunca el cuerpo, que puede llevar datos personales.
+ */
+export function describeWooRejection(method: string, status: number, code?: string, params?: string[]): string {
+  const tail = code ? ` [${code}${params?.length ? `: ${params.join(", ")}` : ""}]` : "";
+  if (status === 401) return `WooCommerce rechazó las credenciales (401)${tail}. Consumer Key/Secret incorrectos o revocados; si son correctos, el servidor puede estar eliminando la cabecera Authorization (Apache/CGI).`;
+  if (status === 403) return `La clave de WooCommerce no tiene permiso para ${method} (403)${tail}. Genera una clave con permisos de Lectura/Escritura de un usuario administrador o gestor de tienda.`;
+  if (status === 404) return `WooCommerce no encontró el recurso (404)${tail}. El ID no existe o la URL no expone /wp-json/wc/v3 (enlaces permanentes desactivados o no es WooCommerce).`;
+  if (status === 400) return `WooCommerce rechazó los datos (400)${tail}.`;
+  if (status === 429) return `WooCommerce limitó las peticiones (429)${tail}. Reintenta en unos segundos.`;
+  return `WooCommerce rechazó ${method} (${status})${tail}. Revisa el recurso y sus datos.`;
 }
 
 const MUSCLE_FACTORY_KEY_REF = "envref:MUSCLE_FACTORY_WC_CONSUMER_KEY";
@@ -75,8 +91,20 @@ export class WooClient {
         headers: { Authorization: this.auth, "Content-Type": "application/json" },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
-    } catch { throw new WooError(method === "GET" || method === "OPTIONS" ? "WooCommerce no respondió a tiempo" : "Resultado de escritura desconocido. No repetir: comprobar primero en WooCommerce.", 502); }
-    if (!r.ok) throw new WooError(`WooCommerce rechazó ${method} (${r.status}). ${r.status === 401 || r.status === 403 ? "Comprueba los permisos de la conexión." : "Revisa el recurso y sus datos."}`, r.status === 401 || r.status === 403 ? 403 : r.status === 400 ? 400 : 502);
+    } catch (e) {
+      if (method !== "GET" && method !== "OPTIONS") throw new WooError("Resultado de escritura desconocido. No repetir: comprobar primero en WooCommerce.", 502);
+      const timeout = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+      throw new WooError(timeout ? "WooCommerce no respondió a tiempo" : "No se pudo conectar con la tienda WooCommerce (DNS, certificado HTTPS o redirección)", timeout ? 504 : 502);
+    }
+    if (!r.ok) {
+      let code: string | undefined, params: string[] | undefined;
+      try {
+        const body = await r.json() as { code?: unknown; data?: { params?: Record<string, unknown> } };
+        if (typeof body?.code === "string" && /^[a-z0-9_]{1,80}$/i.test(body.code)) code = body.code;
+        if (body?.data?.params && typeof body.data.params === "object") params = Object.keys(body.data.params).filter(k => /^[a-z0-9_.[\]]{1,60}$/i.test(k)).slice(0, 10);
+      } catch { /* cuerpo no JSON: no se expone */ }
+      throw new WooError(describeWooRejection(method, r.status, code, params), r.status === 401 || r.status === 403 ? 403 : r.status === 400 ? 400 : r.status === 404 ? 404 : 502, r.status, code);
+    }
     return r;
   }
   async request<T = any>(method: string, path: string, body?: unknown): Promise<T> {

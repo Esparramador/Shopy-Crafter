@@ -76,7 +76,7 @@ export const PLATFORMS: Record<PlatformKey, PlatformDefinition> = {
     credentialHint: "Consumer Key (ck_) y Consumer Secret (cs_) de WooCommerce",
     capabilities: STORE_CAPS,
     quickPrompts: STORE_PROMPTS,
-    chatbotContext: "Plataforma WooCommerce: productos, pedidos, inventario y SEO vía REST API. No hay temas ni colecciones gestionables.",
+    chatbotContext: "Plataforma WooCommerce (API REST wc/v3 con Consumer Key/Secret). Desde el chat: listar, leer, crear, editar y borrar productos (simples y variables; el precio de un variable se cambia en cada variación), stock por producto o variación, SEO del producto y lectura de pedidos. En el WooCommerce Hub además: categorías (equivalen a las colecciones), atributos, cupones, clientes y estado/nota de pedidos. El SEO (título, meta descripción, palabra clave) lo guardan Yoast SEO o Rank Math; sin uno de esos plugins WooCommerce no tiene campos SEO. No se gestionan temas de WordPress ni se crean pedidos o reembolsos.",
   },
   prestashop: {
     key: "prestashop", label: "PrestaShop", icon: "🔴", color: "#df0067",
