@@ -4,7 +4,7 @@ description: Verified live model IDs for all AI providers — deep 20-search par
 ---
 
 ## Runway (api.dev.runwayml.com/v1, header 2024-11-06)
-- Gen4.5 API model ID: `gen4_5` (underscore) — NOT `gen4.5` (dot was wrong, causes 400)
+- Gen4.5 `/image_to_video` API model ID: `gen4.5` (dot); the internal selector `gen4_5` must be mapped to it. The live official schema confirms the dotted ID.
 - Gen4.5-Turbo: `gen4_5_turbo`
 - Aleph 2.0: `aleph2` — V2V only (video-to-video edit), NOT T2V/I2V
 - HappyHorse 1.0: `happyhorse_1_0` — T2V+I2V
@@ -53,6 +53,6 @@ description: Verified live model IDs for all AI providers — deep 20-search par
 ## Meshy AI
 - `meshy-6` active; `meshy-5` active; `latest` → meshy-6; meshy-4 RETIRED
 
-**Why:** `gen4_5` bug caused 400 errors on every Runway Gen4.5 request. Freepik omni split into -pro/-std variants. 5 new models discovered (kling-v2.6, kling-v2.1-master, wan-2.7-videoedit, seedance-2.0, hailuo-2.3-fast).
+**Why:** The current Runway API schema for `/image_to_video` declares `gen4.5`; do not infer the wire ID from an internal underscore alias or from a different endpoint. Freepik omni split into -pro/-std variants. 5 new models discovered (kling-v2.6, kling-v2.1-master, wan-2.7-videoedit, seedance-2.0, hailuo-2.3-fast).
 
-**How to apply:** Runway model IDs always use underscores. Replicate models: always verify exact namespace/slug. Tripo3D: always use full date-suffixed version string.
+**How to apply:** Map internal Runway selectors to the exact endpoint-specific wire ID. For `/image_to_video`, Gen-4.5 is `gen4.5`; verify other endpoint schemas independently. Replicate models: always verify exact namespace/slug. Tripo3D: always use full date-suffixed version string.

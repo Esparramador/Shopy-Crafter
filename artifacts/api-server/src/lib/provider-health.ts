@@ -181,21 +181,47 @@ async function checkFreepik(): Promise<ProviderHealth> {
   }
 }
 
-async function checkOpenai(): Promise<ProviderHealth> {
-  const key = process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+export async function checkOpenaiHealth(): Promise<ProviderHealth> {
+  const directKey = process.env.OPENAI_API_KEY?.trim();
+  const integrationKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY?.trim();
+  const integrationBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL?.trim();
   const checkedAt = Date.now();
-  if (!key) return { provider: "openai", status: "missing_key", hasKey: false, checkedAt };
+  const useIntegration = Boolean(integrationKey && integrationBaseUrl);
+  const key = useIntegration ? integrationKey : directKey;
+
+  if (!key) {
+    if (integrationKey && !integrationBaseUrl) {
+      return {
+        provider: "openai",
+        status: "unknown",
+        hasKey: true,
+        detail: "La integración de Replit está presente, pero falta AI_INTEGRATIONS_OPENAI_BASE_URL",
+        checkedAt,
+      };
+    }
+    return { provider: "openai", status: "missing_key", hasKey: false, checkedAt };
+  }
+
+  const url = useIntegration
+    ? `${integrationBaseUrl!.replace(/\/+$/, "")}/models`
+    : "https://api.openai.com/v1/models";
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    const res = await fetch("https://api.openai.com/v1/models", {
+    const res = await fetch(url, {
       headers: { Authorization: `Bearer ${key}` },
-      signal: ctrl.signal,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    clearTimeout(t);
     if (res.status === 401 || res.status === 403) return { provider: "openai", status: "missing_key", hasKey: true, detail: `auth ${res.status}`, checkedAt };
     if (res.status === 402)                       return { provider: "openai", status: "out_of_credits", hasKey: true, detail: "402 sin saldo", checkedAt };
     if (res.status === 429)                       return { provider: "openai", status: "rate_limited", hasKey: true, detail: "429 rate limit", checkedAt };
+    if (useIntegration && (res.status === 404 || res.status === 405)) {
+      return {
+        provider: "openai",
+        status: "unknown",
+        hasKey: true,
+        detail: `El proxy de Replit no expone GET /models (HTTP ${res.status}); no se hizo una petición de generación`,
+        checkedAt,
+      };
+    }
     if (!res.ok)                                  return { provider: "openai", status: "down", hasKey: true, detail: `HTTP ${res.status}`, checkedAt };
     return { provider: "openai", status: "ok", hasKey: true, checkedAt };
   } catch (e: any) {
@@ -232,7 +258,7 @@ const CACHE_TTL_MS = 60_000;
 export async function getAllProvidersHealth(forceFresh = false): Promise<Record<ProviderId, ProviderHealth>> {
   if (!forceFresh && _cache && Date.now() - _cache.ts < CACHE_TTL_MS) return _cache.data;
   const [replicate, runway, gemini, elevenlabs, xai, freepik, openai, nvidia] = await Promise.all([
-    checkReplicate(), checkRunway(), checkGemini(), checkElevenLabs(), checkXai(), checkFreepik(), checkOpenai(), checkNvidia(),
+    checkReplicate(), checkRunway(), checkGemini(), checkElevenLabs(), checkXai(), checkFreepik(), checkOpenaiHealth(), checkNvidia(),
   ]);
   const data: Record<ProviderId, ProviderHealth> = { replicate, runway, gemini, elevenlabs, xai, freepik, openai, nvidia };
   _cache = { ts: Date.now(), data };

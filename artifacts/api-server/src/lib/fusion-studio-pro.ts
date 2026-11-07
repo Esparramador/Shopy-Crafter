@@ -31,7 +31,12 @@ export async function makeTmpDir(prefix = "fs-pro"): Promise<string> {
   return dir;
 }
 
-import { validateImageUrlAsync, generateVideoFromImage as runwayGenerateVideo } from "./runway.js";
+import {
+  validateImageUrlAsync,
+  generateVideoFromImage as runwayGenerateVideo,
+  runwayImageToVideoModelId,
+  type RunwayModel,
+} from "./runway.js";
 import { meteredFetch } from "./provider-meter.js";
 
 export async function fetchToBuffer(url: string, timeoutMs = 180_000): Promise<Buffer> {
@@ -1312,22 +1317,22 @@ export async function generateVideoFromImage(
       "21:9": "1584:672",
     };
     const ratio = ratioMap[opts.aspect || "9:16"] || (isGen3 ? "768:1280" : "720:1280");
-    const runwayModel = isGen3 ? "gen3a_turbo"
-      : model === "runway-gen4.5" ? "gen4.5"
+    const runwayModel: RunwayModel = isGen3 ? "gen3a_turbo"
+      : model === "runway-gen4.5" || model === "runway-gen5" ? "gen4_5"
       : model === "runway-gen4.5-turbo" ? "gen4_5_turbo"
       : model === "runway-seedance2" ? "seedance2"
       : model === "runway-seedance2-fast" ? "seedance2_fast"
-      : model === "runway-gen5" ? "gen4.5"
       : model === "runway-aleph2" ? "aleph2"
       : model === "runway-happyhorse" ? "happyhorse_1_0"
       : "gen4_turbo";
+    const apiModel = runwayImageToVideoModelId(runwayModel);
     // gen4.5 acepta 2-10 s; gen4_turbo 5 o 10.
-    const runwayDur = runwayModel === "gen4.5" ? Math.min(Math.max(Math.round(duration), 2), 10) : (duration >= 8 ? 10 : 5);
+    const runwayDur = apiModel === "gen4.5" ? Math.min(Math.max(Math.round(duration), 2), 10) : (duration >= 8 ? 10 : 5);
 
     const createRes = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "X-Runway-Version": "2024-11-06" },
-      body: JSON.stringify({ model: runwayModel, promptImage: dataUri, promptText: prompt.slice(0, 1000), duration: runwayDur, ratio }),
+      body: JSON.stringify({ model: apiModel, promptImage: dataUri, promptText: prompt.slice(0, 1000), duration: runwayDur, ratio }),
     });
     if (!createRes.ok) throw new Error(`Runway create failed: ${createRes.status} ${(await createRes.text()).slice(0, 200)}`);
     const { id: taskId } = await createRes.json() as { id: string };
