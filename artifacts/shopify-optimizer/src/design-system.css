@@ -5377,3 +5377,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Sin cursor propio dibujado (portátil táctil, puntero del sistema): siempre el cursor normal. */
 html:not(.sc-cursor-on) *, html:not(.sc-cursor-on) body { cursor: auto !important; }
 html:not(.sc-cursor-on) a, html:not(.sc-cursor-on) button { cursor: pointer !important; }
+
+/* ── Pies públicos: columnas de enlaces y sitio para el chat flotante ── */
+.site-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 28px 24px; width: 100%; }
+.fp-footer-standalone .fp-footer-inner { display: grid; grid-template-columns: minmax(200px, 250px) minmax(0, 1fr); gap: 48px; align-items: start; }
+@media (max-width: 900px) {
+  .fp-footer-standalone .fp-footer-inner { grid-template-columns: 1fr; gap: 28px; }
+  .site-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
+  /* El botón del chat flota abajo a la derecha: el pie deja ese hueco para que no tape el copyright ni los enlaces. */
+  .fp-footer-standalone, .pp-footer, .shop-footer { padding-bottom: 96px !important; }
+}

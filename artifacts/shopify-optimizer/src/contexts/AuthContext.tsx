@@ -27,7 +27,7 @@ const SESSION_ALIVE_KEY = "sc_session_alive";
 
 async function fetchMe(): Promise<AuthUser | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
+    const res = await fetch(`${API_BASE}/api/auth/session`, { credentials: "include" });
     if (!res.ok) return null;
     return await res.json();
   } catch {

@@ -17,13 +17,17 @@ export default function SCCursor() {
     const isInteractive = (target: EventTarget | null) =>
       target instanceof Element && Boolean(target.closest("a, button, [role='button'], input, select, textarea, label"));
 
+    let hovering = false;
     const clearHover = () => {
+      if (!hovering) return;
+      hovering = false;
       dotRef.current?.classList.remove("sc-cursor-hover");
       ringRef.current?.classList.remove("sc-ring-hover");
     };
 
     const onOver = (e: PointerEvent) => {
-      if (isInteractive(e.target)) {
+      if (!hovering && isInteractive(e.target)) {
+        hovering = true;
         dotRef.current?.classList.add("sc-cursor-hover");
         ringRef.current?.classList.add("sc-ring-hover");
       }
@@ -36,15 +40,18 @@ export default function SCCursor() {
       if (isInteractive(e.relatedTarget)) return;
       clearHover();
     };
+    // La posición va en la propiedad `translate`, no en `transform`: el aumento al pasar por un enlace usa
+    // `scale`, y el navegador aplica `scale` también sobre lo que hay en `transform`, así que con transform
+    // el desplazamiento se multiplicaba por 1,15 y el cursor saltaba ~100 px lejos del ratón.
     const anim = () => {
       if (!animating) return;
       if (dotRef.current) {
-        dotRef.current.style.transform = `translate3d(${mx.current - 14}px, ${my.current - 14}px, 0)`;
+        dotRef.current.style.translate = `${mx.current - 14}px ${my.current - 14}px`;
       }
       if (ringRef.current) {
         rx.current += (mx.current - rx.current) * 0.12;
         ry.current += (my.current - ry.current) * 0.12;
-        ringRef.current.style.transform = `translate3d(${rx.current - 22}px, ${ry.current - 22}px, 0)`;
+        ringRef.current.style.translate = `${rx.current - 22}px ${ry.current - 22}px`;
       }
       raf = requestAnimationFrame(anim);
     };
@@ -57,13 +64,14 @@ export default function SCCursor() {
 
     const hideCursor = () => {
       cursorVisible = false;
+      hovering = false;
       root.classList.remove("sc-cursor-on");
       dotRef.current?.classList.remove("sc-cursor-visible", "sc-cursor-hover");
       ringRef.current?.classList.remove("sc-cursor-visible", "sc-ring-hover");
       stopAnimation();
       mx.current = my.current = rx.current = ry.current = 0;
-      if (dotRef.current) dotRef.current.style.transform = "";
-      if (ringRef.current) ringRef.current.style.transform = "";
+      if (dotRef.current) dotRef.current.style.translate = "";
+      if (ringRef.current) ringRef.current.style.translate = "";
     };
 
     const move = (e: PointerEvent) => {
@@ -79,16 +87,18 @@ export default function SCCursor() {
         rx.current = e.clientX;
         ry.current = e.clientY;
         if (dotRef.current) {
-          dotRef.current.style.transform = `translate3d(${e.clientX - 14}px, ${e.clientY - 14}px, 0)`;
+          dotRef.current.style.translate = `${e.clientX - 14}px ${e.clientY - 14}px`;
         }
         if (ringRef.current) {
-          ringRef.current.style.transform = `translate3d(${e.clientX - 22}px, ${e.clientY - 22}px, 0)`;
+          ringRef.current.style.translate = `${e.clientX - 22}px ${e.clientY - 22}px`;
         }
         cursorVisible = true;
+        // Solo al aparecer: cambiar la clase de <html> obliga a recalcular el estilo de toda la página,
+        // y hacerlo en cada movimiento del ratón era lo que hacía temblar el cursor en el header y el pie.
+        root.classList.add("sc-cursor-on");
+        dotRef.current?.classList.add("sc-cursor-visible");
+        ringRef.current?.classList.add("sc-cursor-visible");
       }
-      root.classList.add("sc-cursor-on");
-      dotRef.current?.classList.add("sc-cursor-visible");
-      ringRef.current?.classList.add("sc-cursor-visible");
       if (!animating) {
         animating = true;
         raf = requestAnimationFrame(anim);

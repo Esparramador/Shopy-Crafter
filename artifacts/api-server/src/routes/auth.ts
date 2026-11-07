@@ -167,6 +167,20 @@ router.post("/logout", (req, res): void => {
   }
 });
 
+/** Para la app pública: ¿hay sesión? Responde 200 con el usuario o null; un visitante no es un error. */
+router.get("/session", async (req, res): Promise<void> => {
+  if (!req.session.userId) { res.json(null); return; }
+  try {
+    const [user] = await db.select({
+      id: usersTable.id, email: usersTable.email, name: usersTable.name, role: usersTable.role,
+      clientId: usersTable.clientId, avatarColor: usersTable.avatarColor,
+    }).from(usersTable).where(eq(usersTable.id, req.session.userId));
+    res.json(user ? { ...user, impersonating: req.session.impersonating ?? null } : null);
+  } catch {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/me", requireAuth, async (req, res): Promise<void> => {
   try {
     const [user] = await db.select({

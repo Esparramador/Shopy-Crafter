@@ -5,8 +5,7 @@ import { SITE_LINK_GROUPS } from "@/seo/meta";
 export default function SiteLinks({ className }: { className?: string }) {
   return (
     <div
-      className={className}
-      style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 28, width: "100%" }}
+      className={`site-links${className ? ` ${className}` : ""}`}
     >
       {SITE_LINK_GROUPS.map(group => (
         <nav key={group.title} aria-label={group.title}>

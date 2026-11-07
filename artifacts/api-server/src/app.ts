@@ -89,7 +89,9 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   store: new PgRateLimitStore("auth"),
   message: { error: "Demasiados intentos. Espera 15 minutos antes de reintentar.", code: "RATE_LIMITED" },
-  skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
+  // Solo cuentan los intentos (POST: login, registro, recuperar). Las lecturas de sesión que hace cada
+  // página pública no son intentos: antes, ver ~20 páginas en 15 min agotaba el cupo y bloqueaba el login.
+  skip: (req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test" || req.method === "GET" || req.method === "HEAD",
 });
 
 const apiLimiter = rateLimit({
