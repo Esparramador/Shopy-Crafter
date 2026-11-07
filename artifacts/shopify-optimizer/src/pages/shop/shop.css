@@ -372,10 +372,19 @@
 }
 
 /* Ver demo: acción secundaria muy visible, en jade. */
-.shop-demo-btn { display: flex; width: 100%; justify-content: center; align-items: center; gap: 10px; margin-top: 14px; color: #06170f; border: 0; background: linear-gradient(135deg, #2dd49f, #5bddb4); box-shadow: 0 12px 30px -12px rgba(45,212,159,.8); animation: shop-demo-ring 2.4s ease-out infinite; text-decoration: none; font-weight: 800; }
-.shop-demo-btn:hover { transform: translateY(-2px); }
+.shop-demo-btn { display: flex; width: 100%; justify-content: center; align-items: center; gap: 10px; margin: 14px 0 18px; color: #06170f; border: 0; background: linear-gradient(135deg, #2dd49f, #5bddb4); box-shadow: 0 12px 30px -12px rgba(45,212,159,.8); animation: shop-demo-ring 2.4s ease-out infinite; text-decoration: none; font-weight: 800; }
+/* Sin transición de transform: la entrada de la ficha (GSAP) mueve este botón y una transición CSS la frena a medias, dejándolo encima del precio. */
+.shop-demo-btn { transition: filter .2s, box-shadow .2s; }
+.shop-demo-btn:hover { filter: brightness(1.08); }
 @keyframes shop-demo-ring { 0% { box-shadow: 0 0 0 0 rgba(45,212,159,.5); } 70%, 100% { box-shadow: 0 0 0 12px rgba(45,212,159,0); } }
 .shop-card-demo { position: absolute; left: 12px; bottom: 12px; z-index: 2; padding: 5px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 800; color: #06170f; background: linear-gradient(135deg, #2dd49f, #5bddb4); }
 .shop-promo-min { display: none; }
 @media (max-width: 640px) { .shop-promo span:nth-child(3) { display: inline !important; } .shop-promo span:first-child, .shop-promo-sep { display: none; } }
 @media (prefers-reduced-motion: reduce) { .shop-demo-btn { animation: none; } }
+
+/* Dos puertas de entrada al catálogo */
+.shop-doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 0 0 34px; }
+.shop-door { display: block; padding: 24px; border-radius: 18px; text-decoration: none; color: inherit; border: 1px solid rgba(201,169,97,.25); background: linear-gradient(135deg, rgba(201,169,97,.12), rgba(201,169,97,.02)); transition: transform .25s, border-color .25s; }
+.shop-door:hover { transform: translateY(-3px); border-color: rgba(201,169,97,.6); }
+.shop-door strong { display: block; font-family: var(--s-fh); font-weight: 400; font-size: 28px; margin-bottom: 6px; }
+.shop-door span { color: var(--s-t2); font-size: 14.5px; line-height: 1.55; }
