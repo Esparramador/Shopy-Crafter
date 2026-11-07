@@ -630,21 +630,75 @@ async function ensureConvAITtsHistoryTable(): Promise<void> {
   `);
 }
 
-async function getConvAITtsHistory(): Promise<ReturnType<typeof parseConvAITtsHistory>> {
+/** Cambios recientes que muestra la tarjeta compacta. */
+const CONVAI_TTS_HISTORY_CARD_SIZE = 5;
+/** Página máxima del historial completo (#144). */
+const CONVAI_TTS_HISTORY_MAX_PAGE = 50;
+
+/**
+ * Historial de cambios de voz, del más reciente al más antiguo. `before` es el
+ * id de la última entrada de la página anterior (paginación por cursor sobre
+ * created_at + id, estable aunque entren cambios nuevos mientras se navega).
+ */
+async function getConvAITtsHistoryPage(
+  limit: number,
+  before?: string,
+): Promise<{ entries: ReturnType<typeof parseConvAITtsHistory>; hasMore: boolean }> {
   await ensureConvAITtsHistoryTable();
+  const cursor = before
+    ? sql`WHERE (created_at, id) < (SELECT created_at, id FROM convai_tts_settings_history WHERE id = ${before})`
+    : sql``;
   const result = await db.execute(sql`
     SELECT id, created_at, user_id, user_name, user_email, settings
     FROM convai_tts_settings_history
+    ${cursor}
     ORDER BY created_at DESC, id DESC
-    LIMIT 5
+    LIMIT ${limit + 1}
   `);
   const rows = ((result as any).rows ?? (Array.isArray(result) ? result : [])) as Parameters<typeof parseConvAITtsHistory>[0];
-  return parseConvAITtsHistory(rows);
+  return { entries: parseConvAITtsHistory(rows.slice(0, limit)), hasMore: rows.length > limit };
+}
+
+async function getConvAITtsHistory(): Promise<ReturnType<typeof parseConvAITtsHistory>> {
+  return (await getConvAITtsHistoryPage(CONVAI_TTS_HISTORY_CARD_SIZE)).entries;
+}
+
+/**
+ * Versión de los ajustes de voz guardados (#145): huella de las tres filas
+ * convai_tts_* con su updated_at. Cambia con cada guardado, aunque se guarden
+ * los mismos valores, así que identifica "lo que el formulario cargó".
+ */
+async function getConvAITtsSettingsVersion(
+  executor: { execute: typeof db.execute } = db,
+): Promise<string> {
+  const keys = Object.values(CONVAI_TTS_KV_KEYS);
+  const result = await executor.execute(sql`
+    SELECT md5(COALESCE(string_agg(
+      key || ':' || COALESCE(value, '') || ':' || COALESCE(updated_at::text, ''),
+      '|' ORDER BY key
+    ), '')) AS revision
+    FROM platform_settings_kv
+    WHERE key IN (${sql.join(keys.map(key => sql`${key}`), sql`, `)})
+  `);
+  const revision = (result as any).rows?.[0]?.revision;
+  if (typeof revision !== "string") throw new Error("No se pudo leer la versión de los ajustes de voz.");
+  return revision;
+}
+
+/** Otro admin guardó la voz desde que este formulario cargó (#145). */
+class ConvAITtsSettingsConflictError extends Error {
+  readonly currentVersion: string;
+  constructor(currentVersion: string) {
+    super("Otro administrador ha cambiado la voz desde que abriste el formulario.");
+    this.name = "ConvAITtsSettingsConflictError";
+    this.currentVersion = currentVersion;
+  }
 }
 
 async function saveConvAITtsSettingsWithHistory(
   settings: ConvAITtsSettings,
   actor: { userId: string; name: string; email: string },
+  expectedVersion?: string,
 ): Promise<void> {
   await ensurePlatformSettingsKV();
   await ensureConvAITtsHistoryTable();
@@ -654,6 +708,12 @@ async function saveConvAITtsSettingsWithHistory(
     // sync. This makes the save and a provider PATCH/readback serializable.
     for (const type of ["admin", "client", "landing"] as const) {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"convai-agent-sync:" + type}, 0))`);
+    }
+    // Comprobación optimista bajo los mismos bloqueos: dos admins que guardan a
+    // la vez quedan serializados y el segundo ve la versión del primero.
+    if (expectedVersion !== undefined) {
+      const currentVersion = await getConvAITtsSettingsVersion(tx as unknown as { execute: typeof db.execute });
+      if (currentVersion !== expectedVersion) throw new ConvAITtsSettingsConflictError(currentVersion);
     }
     for (const key of Object.keys(CONVAI_TTS_KV_KEYS) as Array<keyof ConvAITtsSettings>) {
       await tx.execute(sql`
@@ -1203,18 +1263,223 @@ router.post("/voice/convai/reset-agents", requireAdmin, async (req, res): Promis
   }
 });
 
+// ── Agentes ConvAI huérfanos / duplicados (#88) ───────────────────────────────
+// Restos de resets antiguos ("Arturo — Secretario…" repetidos, "ShopyBrain —
+// Asistente Admin") que ya no reciben las sincronizaciones de voz/prompt. Se
+// listan con vista previa y solo se borran con confirmación explícita del admin.
+// NUNCA se borra un agente referenciado en platform_settings_kv (cualquier clave)
+// ni el fijado por ELEVEN_CONVAI_DEFAULT_AGENT_ID, ni agentes creados a mano.
+const MANAGED_AGENT_NAME_PREFIXES = ["Arturo — Secretario", "ShopyBrain —"];
+
+function isPlatformManagedAgentName(name: unknown): boolean {
+  return typeof name === "string" && MANAGED_AGENT_NAME_PREFIXES.some(prefix => name.startsWith(prefix));
+}
+
+export type ConvAIAgentAuditEntry = {
+  agentId: string;
+  name: string;
+  createdAt: string | null;
+  /** Claves de platform_settings_kv (o "env:ELEVEN_CONVAI_DEFAULT_AGENT_ID") que lo usan. */
+  references: string[];
+  /** in_use: referenciado · orphan: de la plataforma y sin referencia · custom: creado a mano. */
+  status: "in_use" | "orphan" | "custom";
+};
+
+async function auditConvAIAgents(executor: { execute: typeof db.execute } = db): Promise<ConvAIAgentAuditEntry[]> {
+  const agents = await listConvAIAgents();
+  const ids = agents.map(agent => agent.agent_id).filter((id): id is string => typeof id === "string" && id.length > 0);
+  const references = new Map<string, string[]>();
+  const addRef = (id: string, ref: string) => references.set(id, [...(references.get(id) ?? []), ref]);
+  if (ids.length) {
+    await ensurePlatformSettingsKV();
+    const rows = await executor.execute(sql`
+      SELECT key, value FROM platform_settings_kv
+      WHERE value IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})
+    `);
+    for (const row of ((rows as any).rows ?? []) as Array<{ key: string; value: string }>) addRef(row.value, row.key);
+  }
+  const pinned = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID?.trim();
+  if (pinned) addRef(pinned, "env:ELEVEN_CONVAI_DEFAULT_AGENT_ID");
+  for (const [key, id] of Object.entries(_agentIdCache)) {
+    if (id && !(references.get(id) ?? []).includes(key)) addRef(id, key);
+  }
+  return agents.map(agent => {
+    const refs = references.get(agent.agent_id) ?? [];
+    return {
+      agentId: agent.agent_id,
+      name: agent.name ?? "",
+      createdAt: typeof agent.created_at_unix_secs === "number" ? new Date(agent.created_at_unix_secs * 1000).toISOString() : null,
+      references: refs,
+      status: refs.length ? "in_use" : isPlatformManagedAgentName(agent.name) ? "orphan" : "custom",
+    };
+  });
+}
+
+router.get("/voice/convai/orphans", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    const agents = await auditConvAIAgents();
+    const byName = new Map<string, number>();
+    for (const agent of agents) byName.set(agent.name, (byName.get(agent.name) ?? 0) + 1);
+    res.json({
+      agents,
+      orphanIds: agents.filter(agent => agent.status === "orphan").map(agent => agent.agentId),
+      duplicateNames: [...byName].filter(([, count]) => count > 1).map(([name, count]) => ({ name, count })),
+    });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/orphans audit failed");
+    res.status(500).json({ error: err?.message || "Error revisando los agentes de ElevenLabs" });
+  }
+});
+
+router.post("/voice/convai/orphans/delete", requireAdmin, async (req, res): Promise<void> => {
+  const agentIds = req.body?.agentIds;
+  if (req.body?.confirm !== true) {
+    res.status(400).json({ error: "Falta la confirmación explícita (confirm: true)." });
+    return;
+  }
+  if (!Array.isArray(agentIds) || agentIds.length === 0 || agentIds.length > 50
+    || agentIds.some((id: unknown) => typeof id !== "string" || !id.trim())
+    || new Set(agentIds).size !== agentIds.length) {
+    res.status(400).json({ error: "agentIds debe ser una lista no vacía (máx. 50) de IDs distintos." });
+    return;
+  }
+  try {
+    await ensurePlatformSettingsKV();
+    type DeleteResult = { agentId: string; status: "deleted" | "error"; error?: string };
+    const outcome = await db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL lock_timeout = '75000ms'`);
+      // Mismos bloqueos que reset/llamadas: ningún agente puede pasar a estar en
+      // uso entre la comprobación y el borrado.
+      for (const type of ["admin", "client", "landing"] as const) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${"convai-agent-sync:" + type}, 0))`);
+      }
+      const audit = await auditConvAIAgents(tx as unknown as { execute: typeof db.execute });
+      const byId = new Map(audit.map(agent => [agent.agentId, agent]));
+      const refused = (agentIds as string[])
+        .map(id => ({ agentId: id, agent: byId.get(id) }))
+        .filter(({ agent }) => agent?.status !== "orphan")
+        .map(({ agentId, agent }) => ({
+          agentId,
+          reason: !agent ? "not_found" : agent.status === "in_use" ? "referenced" : "custom",
+          references: agent?.references ?? [],
+        }));
+      const results: DeleteResult[] = [];
+      // La vista previa estaba desactualizada: no se borra NADA.
+      if (refused.length) return { refused, results };
+      for (const id of agentIds as string[]) {
+        try {
+          await deleteConvAIAgent(id);
+          results.push({ agentId: id, status: "deleted" });
+        } catch (err: any) {
+          results.push({ agentId: id, status: "error", error: err?.message || "Error borrando el agente" });
+        }
+      }
+      return { refused, results };
+    });
+    if (outcome.refused.length) {
+      res.status(409).json({
+        error: "Algunos agentes ya no son huérfanos o no existen; no se ha borrado ninguno. Vuelve a revisar.",
+        refused: outcome.refused,
+      });
+      return;
+    }
+    logger.info({ results: outcome.results }, "ConvAI orphan agents cleanup");
+    const failed = outcome.results.some(result => result.status === "error");
+    res.status(failed ? 502 : 200).json({ success: !failed, results: outcome.results });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/orphans delete failed");
+    res.status(500).json({ error: err?.message || "Error borrando agentes huérfanos" });
+  }
+});
+
 // ── Ajustes de voz de Arturo (stability / similarity_boost / speed) ───────────
 // Persistidos en platform_settings_kv para afinar la voz desde el panel sin
 // redesplegar. Guardar invalida la caché; "Guardar y aplicar ahora" sincroniza
 // los agentes existentes en sitio y verifica lo persistido en ElevenLabs.
+// ── Último informe de "aplicar a los agentes" (#150) ──────────────────────────
+// Se guarda en platform_settings_kv para que el admin, al volver al panel, vea
+// qué agentes fallaron y pueda reintentar solo esos sin volver a guardar. Solo
+// vale para la versión de ajustes con la que se generó: tras un guardado nuevo
+// el informe antiguo deja de mostrarse.
+const CONVAI_APPLY_REPORT_KEY = "convai_voice_apply_report";
+
+type VoiceApplyAgentResult = {
+  agentId: string | null;
+  status: "applied" | "not_created" | "error";
+  error?: string;
+  sharedFlight?: boolean;
+  /** Momento en que se obtuvo este resultado concreto (un reintento solo actualiza los suyos). */
+  at?: string;
+};
+
+export interface ConvAIVoiceApplyReport {
+  settingsVersion: string;
+  updatedAt: string;
+  updatedBy: string;
+  agents: Partial<Record<AgentType, VoiceApplyAgentResult>>;
+}
+
+async function readConvAIVoiceApplyReport(): Promise<ConvAIVoiceApplyReport | null> {
+  try {
+    await ensurePlatformSettingsKV();
+    const rows = await db.execute(sql`SELECT value FROM platform_settings_kv WHERE key = ${CONVAI_APPLY_REPORT_KEY}`);
+    const raw = ((rows as any).rows ?? [])[0]?.value;
+    if (typeof raw !== "string" || !raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.settingsVersion !== "string" || typeof parsed.agents !== "object" || !parsed.agents) return null;
+    return parsed as ConvAIVoiceApplyReport;
+  } catch (err) {
+    logger.warn({ err: (err as Error)?.message }, "ConvAI: could not read the last voice apply report");
+    return null;
+  }
+}
+
+async function persistConvAIVoiceApplyReport(
+  agents: Partial<Record<AgentType, VoiceApplyAgentResult>>,
+  partial: boolean,
+  actor: string,
+): Promise<ConvAIVoiceApplyReport | null> {
+  try {
+    const settingsVersion = await getConvAITtsSettingsVersion();
+    const previous = partial ? await readConvAIVoiceApplyReport() : null;
+    const at = new Date().toISOString();
+    const stamped = Object.fromEntries(
+      Object.entries(agents).map(([type, result]) => [type, { ...result, at }]),
+    ) as ConvAIVoiceApplyReport["agents"];
+    const report: ConvAIVoiceApplyReport = {
+      settingsVersion,
+      updatedAt: at,
+      updatedBy: actor,
+      // Un reintento de los fallidos conserva los que ya se aplicaron con ESTA versión.
+      agents: previous && previous.settingsVersion === settingsVersion ? { ...previous.agents, ...stamped } : stamped,
+    };
+    await db.execute(sql`
+      INSERT INTO platform_settings_kv (key, value, updated_at)
+      VALUES (${CONVAI_APPLY_REPORT_KEY}, ${JSON.stringify(report)}, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+    `);
+    return report;
+  } catch (err) {
+    // El informe es una ayuda del panel: no convertir un apply correcto en error.
+    logger.warn({ err: (err as Error)?.message }, "ConvAI: could not persist the voice apply report");
+    return null;
+  }
+}
+
 async function respondTtsSettings(res: import("express").Response, extra: Record<string, unknown> = {}): Promise<void> {
   const stored = await getConvAITtsSettingsStored();
-  const history = await getConvAITtsHistory();
+  const [history, version, lastApply] = await Promise.all([
+    getConvAITtsHistory(),
+    getConvAITtsSettingsVersion(),
+    readConvAIVoiceApplyReport(),
+  ]);
   res.json({
     settings: stored.settings,
     source: stored.source,
     invalid: stored.invalid,
     history,
+    version,
+    lastApply: lastApply && lastApply.settingsVersion === version ? lastApply : null,
     defaults: CONVAI_TTS_DEFAULTS,
     limits: CONVAI_TTS_LIMITS,
     voiceId: await resolveSevillanoVoiceId(),
@@ -1246,17 +1511,65 @@ router.put("/voice/convai/voice-settings", requireAdmin, async (req, res): Promi
     res.status(400).json({ error: err?.message || "Ajustes de voz inválidos" });
     return;
   }
+  // Versión que cargó el formulario (#145). Sin ella (scripts, clientes antiguos)
+  // se guarda como antes; el panel la envía siempre.
+  const rawVersion = req.body?.expectedVersion ?? req.get("If-Match")?.replace(/^W\//, "").replace(/"/g, "");
+  if (rawVersion !== undefined && (typeof rawVersion !== "string" || !rawVersion.trim())) {
+    res.status(400).json({ error: "expectedVersion debe ser la versión devuelta al cargar los ajustes." });
+    return;
+  }
+  const expectedVersion = typeof rawVersion === "string" ? rawVersion.trim() : undefined;
   try {
     await saveConvAITtsSettingsWithHistory(settings, {
       userId: req.session.userId!,
       name: req.session.name || "Admin",
       email: req.session.email || "",
-    });
+    }, expectedVersion);
     logger.info({ settings }, "ConvAI TTS settings saved from admin panel; agent cache invalidated");
     await respondTtsSettings(res, { saved: true });
   } catch (err: any) {
+    if (err instanceof ConvAITtsSettingsConflictError) {
+      // No se guarda nada: el admin decide si recarga o confirma sobre lo nuevo.
+      _ttsSettingsCache = null;
+      try {
+        const stored = await getConvAITtsSettingsStored();
+        const [history, version] = await Promise.all([getConvAITtsHistory(), getConvAITtsSettingsVersion()]);
+        res.status(409).json({
+          error: err.message,
+          code: "voice_settings_conflict",
+          current: { settings: stored.settings, source: stored.source, version, lastChange: history[0] ?? null },
+        });
+      } catch (readErr: any) {
+        res.status(409).json({ error: err.message, code: "voice_settings_conflict", current: { version: err.currentVersion } });
+      }
+      return;
+    }
     logger.error({ err: err?.message }, "convai/voice-settings save failed");
     res.status(500).json({ error: err?.message || "Error guardando los ajustes de voz" });
+  }
+});
+
+// Historial completo de cambios de voz (#144), paginado por cursor.
+// La tarjeta sigue mostrando los 5 últimos; esto es para ver y restaurar los
+// anteriores (la restauración usa el PUT validado normal).
+router.get("/voice/convai/voice-settings/history", requireAdmin, async (req, res): Promise<void> => {
+  const rawLimit = req.query.limit === undefined ? 20 : Number(req.query.limit);
+  if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > CONVAI_TTS_HISTORY_MAX_PAGE) {
+    res.status(400).json({ error: `limit debe ser un entero entre 1 y ${CONVAI_TTS_HISTORY_MAX_PAGE}` });
+    return;
+  }
+  const before = typeof req.query.before === "string" && req.query.before.trim() ? req.query.before.trim() : undefined;
+  if (before !== undefined && !/^\d{1,19}$/.test(before)) {
+    res.status(400).json({ error: "before debe ser el id de un cambio del historial" });
+    return;
+  }
+  try {
+    const page = await getConvAITtsHistoryPage(rawLimit, before);
+    const last = page.entries[page.entries.length - 1];
+    res.json({ entries: page.entries, nextCursor: page.hasMore && last ? last.id : null });
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/voice-settings history failed");
+    res.status(500).json({ error: err?.message || "Error leyendo el historial de la voz" });
   }
 });
 
@@ -1276,12 +1589,7 @@ router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res)
     return;
   }
   const types: AgentType[] = requestedTypes ?? allTypes;
-  const agents: Partial<Record<AgentType, {
-    agentId: string | null;
-    status: "applied" | "not_created" | "error";
-    error?: string;
-    sharedFlight?: boolean;
-  }>> = {};
+  const agents: Partial<Record<AgentType, VoiceApplyAgentResult>> = {};
   let failed = false;
 
   for (const type of types) {
@@ -1370,11 +1678,19 @@ router.post("/voice/convai/voice-settings/apply", requireAdmin, async (req, res)
     }
   }
 
+  // Se persiste también un fallo parcial: es justo lo que el admin necesita
+  // recuperar al volver al panel para reintentar solo los fallidos.
+  const report = await persistConvAIVoiceApplyReport(
+    agents,
+    requestedTypes !== undefined,
+    String(req.session?.email || req.session?.name || req.session?.userId || "admin"),
+  );
+
   if (failed) {
-    res.status(502).json({ success: false, error: "No se pudieron aplicar los ajustes a todos los agentes.", agents });
+    res.status(502).json({ success: false, error: "No se pudieron aplicar los ajustes a todos los agentes.", agents, report });
     return;
   }
-  res.json({ success: true, agents });
+  res.json({ success: true, agents, report });
 });
 
 // Muestra corta con la MISMA voz y modelo que usa Arturo, con los valores del
@@ -1450,9 +1766,21 @@ async function findExistingConvAIAgentId(type: AgentType): Promise<string | null
   const id: string | undefined = rowArr[0]?.value;
   return id && id.length > 4 ? id : null;
 }
-// GET = solo lectura sobre ElevenLabs (no hace PATCH): abrir la pestaña no debe
-// tocar la configuración. La reparación explícita es POST /voice/convai/reset-agents.
-router.get("/voice/convai/health", requireAdmin, async (_req, res): Promise<void> => {
+export interface ConvAIHealthReport {
+  healthy: boolean;
+  degraded: boolean;
+  checkedAt: string;
+  voice: { voiceId: string | null; ok: boolean; code?: string; error?: string };
+  agents: ConvAIAgentHealth[];
+}
+
+/**
+ * Comprobación de salud de las llamadas de voz, reutilizable fuera de la ruta
+ * (barra global de Motores IA y aviso horario por email). Solo lectura sobre
+ * ElevenLabs: 1 consulta de la voz (+ suscripción) y 1 GET por agente existente.
+ * Nunca hace PATCH ni crea agentes.
+ */
+export async function checkConvAIHealth(): Promise<ConvAIHealthReport> {
   const checkedAt = new Date().toISOString();
   const types: AgentType[] = ["admin", "client", "landing"];
 
@@ -1505,13 +1833,24 @@ router.get("/voice/convai/health", requireAdmin, async (_req, res): Promise<void
 
   const healthy = !voiceError && agents.every(a => a.status === "ok" || a.status === "not_created");
   const degraded = !healthy && !voiceError && agents.every(a => a.status !== "error");
-  res.json({
+  return {
     healthy,
     degraded,
     checkedAt,
     voice: { voiceId, ok: !voiceError, code: voiceError?.code, error: voiceError?.error },
     agents,
-  });
+  };
+}
+
+// GET = solo lectura sobre ElevenLabs (no hace PATCH): abrir la pestaña no debe
+// tocar la configuración. La reparación explícita es POST /voice/convai/reset-agents.
+router.get("/voice/convai/health", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    res.json(await checkConvAIHealth());
+  } catch (err: any) {
+    logger.error({ err: err?.message }, "convai/health failed");
+    res.status(500).json({ error: err?.message || "Error comprobando la salud de ConvAI" });
+  }
 });
 
 router.get("/voice/convai/signed-url", requireAdmin, async (req, res): Promise<void> => {
