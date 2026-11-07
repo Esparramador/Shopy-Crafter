@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ModalOverlay } from "@/components/ModalOverlay";
 import { X, Wand2, Film, Shirt, Loader2, Volume2, CheckCircle2, AlertCircle, Download, RefreshCw, Upload, UserCircle2, Plus } from "lucide-react";
+import { parseAdVideoResponse, type AdVideoResponseResult } from "../lib/ad-video-response";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -127,7 +128,13 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<string>("");
   const [error, setError] = useState<string>("");
-  const [result, setResult] = useState<{ url?: string; vaultId?: number | null; meta?: any } | null>(null);
+  const [result, setResult] = useState<AdVideoResponseResult | null>(null);
+
+  useEffect(() => {
+    const url = result?.url;
+    if (!url?.startsWith("blob:")) return;
+    return () => URL.revokeObjectURL(url);
+  }, [result?.url]);
 
   // Character Lock
   const [characters, setCharacters] = useState<CharacterItem[]>([]);
@@ -343,21 +350,15 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
       const res = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "X-Ad-Recovery-Mode": "download",
+        },
         body: JSON.stringify(body),
       });
-      const text = await res.text();
-      let data: any;
-      try { data = JSON.parse(text); } catch { data = { error: text.slice(0, 300) }; }
-      if (!res.ok) {
-        throw new Error(data?.error || `Error ${res.status}`);
-      }
-      const videoUrl = data?.variant?.assets?.finalMp4Url
-        || data?.variant?.assets?.videoUrl
-        || data?.result?.finalVideoUrl
-        || data?.result?.videoUrl;
-      setResult({ url: videoUrl, vaultId: data?.variant?.vaultId ?? data?.result?.vaultId ?? null, meta: data });
-      setProgress("¡Listo!");
+      const parsed = await parseAdVideoResponse(res);
+      setResult(parsed);
+      setProgress(parsed.savedToVault ? "¡Listo!" : "");
     } catch (e: any) {
       setError(e?.message || "Error generando anuncio");
       setProgress("");
@@ -408,15 +409,16 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
 
       const res = await fetch(
         `${API}/api/projects/${projectId}/products/${productId}/videos/tryon-video`,
-        { method: "POST", credentials: "include", body: fd },
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "X-Ad-Recovery-Mode": "download" },
+          body: fd,
+        },
       );
-      const text = await res.text();
-      let data: any;
-      try { data = JSON.parse(text); } catch { data = { error: text.slice(0, 300) }; }
-      if (!res.ok) throw new Error(data?.error || `Error ${res.status}`);
-      const tryonUrl = data?.videoUrl || data?.finalVideoUrl;
-      setResult({ url: tryonUrl, vaultId: data?.vaultId ?? null, meta: data });
-      setProgress("¡Listo!");
+      const parsed = await parseAdVideoResponse(res);
+      setResult(parsed);
+      setProgress(parsed.savedToVault ? "¡Listo!" : "");
     } catch (e: any) {
       setError(e?.message || "Error generando try-on video");
       setProgress("");
@@ -922,10 +924,12 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
             </div>
           )}
           {result && (
-            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30 space-y-2">
+            <div className={`p-3 rounded-lg border space-y-2 ${result.savedToVault ? "bg-green-500/10 border-green-500/30" : "bg-amber-500/10 border-amber-500/40"}`}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-green-300 text-sm font-medium">
-                  <CheckCircle2 className="w-4 h-4" />Anuncio listo {result.vaultId ? `· bóveda #${result.vaultId}` : ""}
+                <div className={`flex items-center gap-2 text-sm font-medium ${result.savedToVault ? "text-green-300" : "text-amber-200"}`}>
+                  {result.savedToVault
+                    ? <><CheckCircle2 className="w-4 h-4" />Vídeo guardado en el Vault · #{result.vaultId}</>
+                    : <><AlertCircle className="w-4 h-4" />Vídeo generado, pero no guardado en el Vault</>}
                 </div>
                 <div className="flex items-center gap-2 text-xs">
                   {result.meta?.fusedFromProduct && (
@@ -939,6 +943,11 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
                   )}
                 </div>
               </div>
+              {!result.savedToVault && (
+                <p className="text-sm text-amber-100">
+                  Descárgalo ahora. No cierres esta ventana ni vuelvas a generar el vídeo: el archivo no quedó guardado.
+                </p>
+              )}
               {result.meta?.script && (
                 <p className="text-xs italic text-muted-foreground">"{result.meta.script}"</p>
               )}
@@ -946,8 +955,13 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
                 <video src={result.url} controls className="w-full max-h-[300px] rounded-lg bg-black" />
               )}
               {result.url && (
-                <a href={result.url} download={`anuncio-${productId}.mp4`} className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 text-green-300 rounded-lg text-sm font-medium">
+                <a href={result.url} download={`anuncio-${productId}.mp4`} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium ${result.savedToVault ? "bg-green-500/20 hover:bg-green-500/30 text-green-300" : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-100"}`}>
                   <Download className="w-4 h-4" />Descargar MP4
+                </a>
+              )}
+              {result.savedToVault && (
+                <a href={`${API}/projects/${projectId}/vault`} className="ml-3 text-sm text-green-200 underline underline-offset-2">
+                  Abrir Vault del proyecto
                 </a>
               )}
             </div>
@@ -959,7 +973,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
             </button>
             <button
               onClick={onSubmit}
-              disabled={submitting || (tab === "tryon" && !modelFile && !characterId)}
+              disabled={submitting || Boolean(result && !result.savedToVault) || (tab === "tryon" && !modelFile && !characterId)}
               className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {submitting ? "Generando..." : tab === "tryon" ? "Generar Video Try-On" : tab === "cinematic" ? "Crear Anuncio Cinematográfico" : "Crear Anuncio Rápido"}

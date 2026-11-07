@@ -13,11 +13,11 @@
  * Coherencia voz↔personaje: el género de la voz seleccionada se propaga
  * automáticamente al `characterGender` del try-on cuando se solicitan juntos.
  */
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { db, projectsTable, productsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import { saveToVault } from "../lib/vault.js";
+import { persistAdVideoToVault } from "../lib/ad-video-persistence.js";
 import { readFile } from "node:fs/promises";
 import { logger } from "../lib/logger.js";
 import { enableLongRunning } from "../lib/long-running.js";
@@ -74,6 +74,32 @@ function getFirstProductImageUrl(product: any): string | null {
 
 function stripHtml(s: string | null | undefined): string {
   return (s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function respondWithUnstoredAdVideo(
+  req: Request,
+  res: Response,
+  video: Buffer,
+  code: string,
+  message: string,
+): void {
+  if (req.get("x-ad-recovery-mode") === "download" && video.length > 0) {
+    res.status(503);
+    res.setHeader("X-Ad-Recovery", "download");
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Disposition", 'attachment; filename="ad-recovery.mp4"');
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Length", String(video.length));
+    res.end(video);
+    return;
+  }
+
+  res.status(503).json({
+    success: false,
+    vaultSaved: false,
+    error: message,
+    code,
+  });
 }
 
 // ─── COMMON BODY ────────────────────────────────────────────────────────────
@@ -220,19 +246,19 @@ router.post(
         return;
       }
 
-      let quickVaultId: number | null = null;
+      let finalMp4: Buffer | null = null;
+      let quickVideo: Awaited<ReturnType<typeof persistAdVideoToVault>> = null;
       try {
-        const finalMp4 = await readFile(v0.assets.finalMp4Path);
-        quickVaultId = await saveToVault({
+        finalMp4 = await readFile(v0.assets.finalMp4Path);
+        quickVideo = await persistAdVideoToVault({
           projectId,
-          fileType: "video",
           category: "smart_quick_ad",
           title: `Anuncio rápido — ${product.title}`,
           mimeType: "video/mp4",
+          buffer: finalMp4,
           productId: product.shopifyProductId,
           productTitle: product.title || undefined,
           generatedBy: `smart-quick:${input.videoProvider}`,
-          content: finalMp4.toString("base64"),
           metadata: {
             durationSec: durationSec,
             voiceId: finalVoiceId,
@@ -246,23 +272,33 @@ router.post(
           },
         });
       } catch (e) {
-        logger.warn({ err: (e as Error)?.message }, "smart-quick: no se pudo persistir en vault (no fatal)");
+        logger.warn({ err: (e as Error)?.message }, "smart-quick: no se pudo confirmar la persistencia en Vault");
       }
 
-      if (quickVaultId) {
-        v0.assets.finalMp4Url = `/api/projects/${projectId}/vault/${quickVaultId}/download`;
-      } else {
-        // Vault save failed — fail loud so the user does not get a useless
-        // response with only local /tmp paths the frontend cannot reach.
+      if (!finalMp4) {
         res.status(500).json({
-          error: "El anuncio se generó pero no se pudo guardar en la bóveda.",
-          code: "AD_QUICK_VAULT_FAILED",
+          success: false,
+          error: "El anuncio no produjo un archivo MP4 recuperable.",
+          code: "AD_QUICK_OUTPUT_MISSING",
           details: errors?.slice(0, 3),
         });
         return;
       }
 
       await recordUsage(projectId, "image", quickCredits);
+      if (!quickVideo) {
+        logger.error({ projectId, productId: product.shopifyProductId }, "smart-quick: MP4 generado pero no quedó persistido en Vault");
+        respondWithUnstoredAdVideo(
+          req,
+          res,
+          finalMp4,
+          "AD_QUICK_VAULT_FAILED",
+          "El vídeo se generó, pero no se pudo confirmar su guardado en el Vault.",
+        );
+        return;
+      }
+
+      v0.assets.finalMp4Url = quickVideo.downloadUrl;
       learnFromOperation({
         operationType: "smart_quick_ad",
         title: `Anuncio rápido generado: ${product.title}`,
@@ -273,6 +309,8 @@ router.post(
 
       res.json({
         success: true,
+        vaultId: quickVideo.vaultId,
+        videoUrl: quickVideo.downloadUrl,
         variant: v0,
         voice: { id: finalVoiceId, name: voice.voiceName, gender: voice.gender, tone: voice.tone, reason: voice.reason },
         characterGender: voice.characterGender, // hint for follow-up tryon-video
@@ -478,18 +516,17 @@ router.post(
       });
 
       // Persist final MP4 to vault — return URL instead of base64 to keep response small.
-      let cineVaultId: number | null = null;
+      let cineVideo: Awaited<ReturnType<typeof persistAdVideoToVault>> = null;
       try {
-        cineVaultId = await saveToVault({
+        cineVideo = await persistAdVideoToVault({
           projectId,
-          fileType: "video",
           category: "smart_cinematic_ad",
           title: `Anuncio cinematográfico — ${product.title}`,
           mimeType: result.finalMime || "video/mp4",
+          buffer: result.finalVideo,
           productId: product.shopifyProductId,
           productTitle: product.title || undefined,
           generatedBy: `smart-cinematic:${body.videoModel || "kling-3.0-turbo"}`,
-          content: result.finalVideo.toString("base64"),
           metadata: {
             scenesCount: result.script.scenes.length,
             durationSec: result.durationSec,
@@ -503,10 +540,22 @@ router.post(
           },
         });
       } catch (e) {
-        logger.warn({ err: (e as Error)?.message }, "smart-cinematic: no se pudo persistir en vault (no fatal)");
+        logger.warn({ err: (e as Error)?.message }, "smart-cinematic: no se pudo confirmar la persistencia en Vault");
       }
 
       await recordUsage(projectId, "image", cineCredits);
+      if (!cineVideo) {
+        logger.error({ projectId, productId: product.shopifyProductId }, "smart-cinematic: MP4 generado pero no quedó persistido en Vault");
+        respondWithUnstoredAdVideo(
+          req,
+          res,
+          result.finalVideo,
+          "AD_CINEMATIC_VAULT_FAILED",
+          "El vídeo se generó, pero no se pudo confirmar su guardado en el Vault.",
+        );
+        return;
+      }
+
       learnFromOperation({
         operationType: "smart_cinematic_ad",
         title: `Anuncio cinematográfico generado: ${product.title}`,
@@ -515,16 +564,16 @@ router.post(
         tags: ["ad", "smart", "cinematic", project.storeNiche || "general"],
       });
 
-      const videoUrl = cineVaultId
-        ? `/api/projects/${projectId}/vault/${cineVaultId}/download`
-        : undefined;
+      const videoUrl = cineVideo.downloadUrl;
 
       res.json({
         success: true,
+        vaultId: cineVideo.vaultId,
+        videoUrl,
         result: {
           finalVideoUrl: videoUrl,
           videoUrl,
-          vaultId: cineVaultId,
+          vaultId: cineVideo.vaultId,
           sizeBytes: result.finalVideo.length,
           durationSec: result.durationSec,
           scenesCount: result.script.scenes.length,
@@ -806,19 +855,18 @@ router.post(
         }
       }
 
-      let vaultId: number | null = null;
+      let savedTryonVideo: Awaited<ReturnType<typeof persistAdVideoToVault>> = null;
       try {
-        vaultId = await saveToVault({
+        savedTryonVideo = await persistAdVideoToVault({
           projectId,
-          fileType: "video",
           category: "tryon_video",
           title: `Video Try-On — ${product.title} [${effectStyle}]${withVoiceover ? " 🎙️" : ""}${lipSyncApplied ? " 👄" : ""}`,
           description: `Try-on en video con ${provider} (${result.model}). Personaje: ${characterGender}. Efecto: ${effectStyle}.${fusedFromProduct ? " Producto fusionado pre-vídeo." : ""}${withVoiceover ? ` Narración: "${(scriptUsed || "").slice(0, 100)}"` : ""}${lipSyncApplied ? " Lip-sync aplicado." : ""}`,
           mimeType: "video/mp4",
+          buffer: finalVideo,
           productId: product.shopifyProductId,
           productTitle: product.title,
           generatedBy: `video-tryon:${result.model}${lipSyncApplied ? "+lipsync" : withVoiceover ? "+vo" : ""}`,
-          content: finalVideo.toString("base64"),
           metadata: {
             provider, model: result.model, effectStyle, characterGender,
             language, duration: result.durationSec, aspect, premium,
@@ -835,10 +883,22 @@ router.post(
           },
         });
       } catch (e) {
-        logger.warn({ err: (e as Error)?.message }, "tryon-video: no se pudo guardar en vault (no fatal)");
+        logger.warn({ err: (e as Error)?.message }, "tryon-video: no se pudo confirmar la persistencia en Vault");
       }
 
       await recordUsage(projectId, "image", creditsForUsd(result.costEstimateUsd + 0.04 + (withVoiceover ? 0.12 : 0), IMAGE_UNIT_COST_EUR));
+      if (!savedTryonVideo) {
+        logger.error({ projectId, productId: product.shopifyProductId }, "tryon-video: MP4 generado pero no quedó persistido en Vault");
+        respondWithUnstoredAdVideo(
+          req,
+          res,
+          finalVideo,
+          "TRYON_VIDEO_VAULT_FAILED",
+          "El vídeo Try-On se generó, pero no se pudo confirmar su guardado en el Vault.",
+        );
+        return;
+      }
+
       learnFromOperation({
         operationType: "tryon_video",
         title: `Video Try-On: ${product.title}`,
@@ -847,13 +907,11 @@ router.post(
         tags: ["tryon", "video", provider, effectStyle, project.storeNiche || "general"],
       });
 
-      const videoUrl = vaultId
-        ? `/api/projects/${projectId}/vault/${vaultId}/download`
-        : undefined;
+      const videoUrl = savedTryonVideo.downloadUrl;
 
       res.json({
         success: true,
-        vaultId,
+        vaultId: savedTryonVideo.vaultId,
         videoUrl,
         finalVideoUrl: videoUrl,
         sizeBytes: finalVideo.length,
