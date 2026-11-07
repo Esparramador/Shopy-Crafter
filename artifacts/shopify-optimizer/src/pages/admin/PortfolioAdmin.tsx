@@ -3,8 +3,13 @@ import { mediaSrc, type PortfolioProject } from "@/components/ProjectsShowcase";
 
 const API_ROOT = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 
-type Project = PortfolioProject & { published: boolean; sortOrder: number };
 type QrImageCheck = { sizePx: number; passed: boolean };
+/** Resultado guardado por el servidor para la versión exacta de la imagen (URL inmutable + huella). */
+type StoredQrCheck = { checks: QrImageCheck[]; passed: boolean; checkedAt: string; sha256: string };
+type AdminImage = PortfolioProject["images"][number] & { qrCheck?: StoredQrCheck };
+type Project = Omit<PortfolioProject, "images"> & { images: AdminImage[]; published: boolean; sortOrder: number };
+type DeletedEntry = { slug: string; title: string; deletedAt: string | null; source: "snapshot" | "seed" | null; published: boolean | null; imageCount: number };
+type DeletedList = { deleted: DeletedEntry[]; unconfirmed: { slug: string; title: string }[] };
 type QrFileReport = { filename: string; checks: QrImageCheck[]; passed: boolean; reason?: string };
 class ApiError extends Error {
   constructor(message: string, readonly body: unknown) { super(message); }
@@ -53,10 +58,14 @@ export default function PortfolioAdmin() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [qrArtwork, setQrArtwork] = useState(false);
   const [qrReports, setQrReports] = useState<QrFileReport[] | null>(null);
+  const [trash, setTrash] = useState<DeletedList>({ deleted: [], unconfirmed: [] });
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
-    try { setProjects(await api<Project[]>("/admin/portfolio")); }
+    try {
+      const [list, removed] = await Promise.all([api<Project[]>("/admin/portfolio"), api<DeletedList>("/admin/portfolio/deleted")]);
+      setProjects(list); setTrash(removed);
+    }
     catch (e) { setMsg({ ok: false, text: e instanceof Error ? e.message : "Error" }); }
   };
   useEffect(() => { void load(); }, []);
@@ -140,10 +149,23 @@ export default function PortfolioAdmin() {
     }, "Orden actualizado");
   };
 
-  const remove = () => current && window.confirm(`¿Borrar "${current.title}" y sus imágenes?`) && run(async () => {
+  const remove = () => current && window.confirm(`¿Borrar "${current.title}"? Podrás restaurarlo desde «Borrados».`) && run(async () => {
     await api(`/admin/portfolio/${current.id}`, { method: "DELETE" });
     setSelected(null);
-  }, "Proyecto borrado");
+  }, "Proyecto borrado (restaurable)");
+
+  const restore = (d: DeletedEntry) => run(async () => {
+    const p = await api<Project>(`/admin/portfolio/deleted/${encodeURIComponent(d.slug)}/restore`, { method: "POST" });
+    setSelected(p.id);
+  }, `«${d.title}» restaurado${d.published === false ? " (oculto, como estaba)" : ""}`);
+
+  const purge = (d: DeletedEntry) => window.confirm(`¿Borrar definitivamente la copia de "${d.title}" y sus imágenes subidas? No se puede deshacer.`) && run(async () => {
+    await api(`/admin/portfolio/deleted/${encodeURIComponent(d.slug)}`, { method: "DELETE" });
+  }, "Copia eliminada definitivamente");
+
+  const confirmDeleted = (slug: string, title: string) => window.confirm(`¿Confirmas que borraste "${title}"? No volverá a crearse con las actualizaciones.`) && run(async () => {
+    await api("/admin/portfolio/deleted", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug }) });
+  }, "Borrado anotado");
 
   const field = (key: keyof typeof EMPTY, label: string, opts: { area?: boolean; placeholder?: string } = {}) => (
     <label style={{ display: "block", marginBottom: 10 }}>
@@ -189,6 +211,34 @@ export default function PortfolioAdmin() {
               <button type="button" style={{ ...s.ghost, padding: "2px 8px" }} disabled={busy} onClick={e => { e.stopPropagation(); void togglePublished(p); }}>{p.published ? "Ocultar" : "Publicar"}</button>
             </div>
           ))}
+          {(trash.deleted.length > 0 || trash.unconfirmed.length > 0) && (
+            <details style={{ marginTop: 14, borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
+              <summary style={{ fontSize: 12, color: "#9896ba", cursor: "pointer" }}>Borrados ({trash.deleted.length}){trash.unconfirmed.length ? ` · ${trash.unconfirmed.length} sin confirmar` : ""}</summary>
+              {trash.deleted.map(d => (
+                <div key={d.slug} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 2px", fontSize: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.title}</div>
+                    <div style={{ fontSize: 11, color: "#9896ba" }}>
+                      {d.source === "snapshot" ? `copia guardada · ${d.imageCount} imágenes · ${d.published ? "publicado" : "oculto"}` : d.source === "seed" ? "se recrea desde la lista original" : "no restaurable"}
+                    </div>
+                  </div>
+                  {d.source && <button type="button" style={{ ...s.ghost, padding: "2px 8px" }} disabled={busy} onClick={() => void restore(d)}>Restaurar</button>}
+                  {d.source === "snapshot" && <button type="button" style={{ ...s.ghost, padding: "2px 8px", color: "#ef4444" }} disabled={busy} title="Borrar definitivamente la copia" onClick={() => void purge(d)}>✕</button>}
+                </div>
+              ))}
+              {trash.unconfirmed.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <p style={{ fontSize: 11, color: "#eab308", margin: "0 0 6px" }}>Proyectos de la lista original que no están y no constan como borrados. Si los borraste tú, confírmalo para que no vuelvan; si no, déjalos (puede que nunca se crearan).</p>
+                  {trash.unconfirmed.map(u => (
+                    <div key={u.slug} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 2px", fontSize: 12 }}>
+                      <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.title}</span>
+                      <button type="button" style={{ ...s.ghost, padding: "2px 8px" }} disabled={busy} onClick={() => void confirmDeleted(u.slug, u.title)}>Lo borré yo</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </details>
+          )}
         </div>
 
         <div style={s.card}>
@@ -222,6 +272,12 @@ export default function PortfolioAdmin() {
                 {current.images.map((im, idx) => (
                   <div key={im.url} style={{ position: "relative", borderRadius: 8, overflow: "hidden", border: idx === 0 ? "2px solid #c9a961" : "1px solid rgba(255,255,255,0.1)" }}>
                     <img src={mediaSrc(im.url)} alt={im.alt} style={{ width: "100%", aspectRatio: "16 / 10", objectFit: "cover", display: "block" }} />
+                    {im.qrCheck && (
+                      <div title={`Comprobado el ${new Date(im.qrCheck.checkedAt).toLocaleString("es-ES")} · huella ${im.qrCheck.sha256.slice(0, 12)}`}
+                        style={{ padding: "4px 6px", fontSize: 10, background: im.qrCheck.passed ? "rgba(45,212,159,.15)" : "rgba(239,68,68,.15)", color: im.qrCheck.passed ? "#6ee7b7" : "#fca5a5" }}>
+                        QR {im.qrCheck.passed ? "verificado" : "no legible"}: {im.qrCheck.checks.map(c => `${c.sizePx}${c.passed ? "✓" : "✗"}`).join(" ")}
+                      </div>
+                    )}
                     <div style={{ display: "flex", gap: 4, padding: 6, background: "rgba(0,0,0,0.6)" }}>
                       {idx !== 0 && <button type="button" style={{ ...s.ghost, padding: "2px 6px", fontSize: 11 }} disabled={busy} onClick={() => void makeCover(im.url)}>Portada</button>}
                       <button type="button" style={{ ...s.ghost, padding: "2px 6px", fontSize: 11, color: "#ef4444" }} disabled={busy} onClick={() => void removeImage(im.url)}>Quitar</button>

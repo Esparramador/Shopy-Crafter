@@ -5,7 +5,11 @@
  *   GET    /api/admin/portfolio                 — todos (admin)
  *   POST   /api/admin/portfolio                 — crear (admin)
  *   PUT    /api/admin/portfolio/:id             — editar (admin)
- *   DELETE /api/admin/portfolio/:id             — borrar (admin)
+ *   DELETE /api/admin/portfolio/:id             — borrar (admin; queda copia restaurable)
+ *   GET    /api/admin/portfolio/deleted         — borrados y proyectos de la semilla sin confirmar (admin)
+ *   POST   /api/admin/portfolio/deleted         — confirmar un borrado anterior al registro (admin, body { slug })
+ *   POST   /api/admin/portfolio/deleted/:slug/restore — restaurar (admin)
+ *   DELETE /api/admin/portfolio/deleted/:slug   — borrar definitivamente la copia y sus imágenes (admin)
  *   POST   /api/admin/portfolio/:id/images      — subir imágenes (admin, multipart "files")
  *   DELETE /api/admin/portfolio/:id/images      — quitar una imagen (admin, body { url })
  */
@@ -18,7 +22,12 @@ import { requireAdmin } from "../lib/auth.js";
 import { logger } from "../lib/logger.js";
 import { saveMedia, getMedia, deleteMedia, mediaIdFromUrl } from "../lib/media-store.js";
 import { checkQrArtworkAtDisplaySizes, type QrArtworkSizeCheck } from "../lib/card-qr-art.js";
-import { SEED, SEED_VERSION, GENERIC_V1, GENERIC_V1_COPY, mergeGenericSeedCopy, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS, removeRetiredQrPortfolioImages } from "./portfolio-seed.js";
+import { createHash } from "node:crypto";
+import {
+  SEED, SEED_VERSION, PATCH_VERSION, PATCH_RENAMES, PATCH_PREVIOUS, PATCH_NEW_SLUGS, PRE_LEDGER_DELETED_SLUGS,
+  removeRetiredQrPortfolioImages, seedDefaultsOf, legacySeedDefaults, mergeSeedProject, confirmedPreLedgerDeletions,
+  type SeedProject, type SeedDefaults,
+} from "./portfolio-seed.js";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 12 } });
@@ -36,7 +45,15 @@ function safeUploadName(name: string): string {
   return basename.replace(/[\u0000-\u001f\u007f]/g, "_").slice(0, 100) || "imagen";
 }
 
-export interface PortfolioImage { url: string; alt: string; w?: number; h?: number }
+/**
+ * Resultado de la verificación QR de UNA versión concreta de una imagen: la URL de /api/media es
+ * inmutable y `sha256` es la huella del WebP servido. Subir otra imagen crea otra entrada sin
+ * resultado; solo el servidor lo escribe (el panel no puede inventarlo ni copiarlo a otra imagen).
+ */
+export interface PortfolioQrCheck {
+  checks: QrArtworkSizeCheck[]; passed: boolean; checkedAt: string; sha256: string;
+}
+export interface PortfolioImage { url: string; alt: string; w?: number; h?: number; qrCheck?: PortfolioQrCheck }
 export interface PortfolioProject {
   id: number; slug: string; title: string; client: string | null; category: string;
   summary: string; description: string; tech: string[]; liveUrl: string | null; appUrl: string | null;
@@ -85,18 +102,42 @@ function ensureTable(): Promise<void> {
         deleted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    await db.execute(sql`ALTER TABLE portfolio_projects ADD COLUMN IF NOT EXISTS seed_defaults JSONB`);
+    await db.execute(sql`ALTER TABLE portfolio_deleted_projects ADD COLUMN IF NOT EXISTS project JSONB`);
+    await backfillPreLedgerDeletions();
     await applySeed();
     await applyPatches();
+    await recordMissingSeedDefaults();
   })().catch(err => { ready = null; throw err; });
   return ready;
+}
+
+function rowState(row: Record<string, unknown>): SeedDefaults {
+  const p = toProject(row);
+  return {
+    title: p.title, client: p.client, category: p.category, status: p.status, summary: p.summary,
+    description: p.description, features: p.features, tech: p.tech, liveUrl: p.liveUrl, appUrl: p.appUrl,
+    images: p.images, sortOrder: p.sortOrder, variants: p.variants,
+  };
+}
+
+async function insertSeedProject(p: SeedProject): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, variants, sort_order, seed_defaults)
+    VALUES (${p.slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${JSON.stringify(p.tech)}::jsonb,
+            ${JSON.stringify(p.features)}::jsonb, ${p.status}, ${p.liveUrl}, ${p.appUrl}, ${JSON.stringify(p.images)}::jsonb,
+            ${JSON.stringify(p.variants)}::jsonb, ${p.sortOrder}, ${JSON.stringify(seedDefaultsOf(p))}::jsonb)
+    ON CONFLICT (slug) DO NOTHING
+  `);
 }
 
 /**
  * Aplica la lista de proyectos reales UNA vez por versión (portfolio_meta.seed_version):
  *  - proyecto que no existe → se crea;
- *  - textos genéricos de la versión 1 → se actualizan campo a campo si siguen intactos;
- *  - textos e imágenes editados desde el panel → se conservan.
- * Los proyectos borrados desde el panel quedan registrados y no se recrean en versiones posteriores.
+ *  - proyecto existente → cada campo (y cada campo de cada versión) que siga con el valor que la
+ *    semilla escribió la vez anterior (seed_defaults) recibe el nuevo; lo editado desde el panel
+ *    se conserva campo a campo;
+ *  - proyectos borrados desde el panel quedan registrados y no se recrean.
  */
 export async function applySeed(): Promise<void> {
   const meta = await db.execute(sql`SELECT value FROM portfolio_meta WHERE key = 'seed_version'`);
@@ -106,40 +147,51 @@ export async function applySeed(): Promise<void> {
   const deletedSlugs = new Set((deletedRows.rows as { slug: string }[]).map(row => row.slug));
   for (const p of SEED) {
     if (deletedSlugs.has(p.slug)) continue;
-    const cur = await db.execute(sql`SELECT id, title, summary, description, images FROM portfolio_projects WHERE slug = ${p.slug}`);
-    const row = cur.rows[0] as { id: number; title: string; summary: string; description: string; images: unknown } | undefined;
-    const tech = JSON.stringify(p.tech), features = JSON.stringify(p.features), images = JSON.stringify(p.images);
-    const variants = JSON.stringify(p.variants);
-    if (!row) {
-      await db.execute(sql`
-        INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, variants, sort_order)
-        VALUES (${p.slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${tech}::jsonb, ${features}::jsonb, ${p.status},
-                ${p.liveUrl}, ${p.appUrl}, ${images}::jsonb, ${variants}::jsonb, ${p.sortOrder})
-        ON CONFLICT (slug) DO NOTHING
-      `);
-    } else if (GENERIC_V1[p.slug] !== undefined) {
-      const previousCopy = GENERIC_V1_COPY[p.slug];
-      if (!previousCopy) throw new Error(`Missing previous generic copy snapshot for portfolio seed: ${p.slug}`);
-      const copy = mergeGenericSeedCopy(row, p, {
-        ...previousCopy,
-        description: GENERIC_V1[p.slug],
-      });
-      await db.execute(sql`
-        UPDATE portfolio_projects SET title = ${copy.title}, client = ${p.client}, category = ${p.category}, summary = ${copy.summary},
-          description = ${copy.description}, tech = ${tech}::jsonb, features = ${features}::jsonb, status = ${p.status},
-          live_url = COALESCE(live_url, ${p.liveUrl}), app_url = COALESCE(app_url, ${p.appUrl}),
-          images = ${JSON.stringify(copy.images)}::jsonb, variants = ${variants}::jsonb, sort_order = ${p.sortOrder}, updated_at = NOW()
-        WHERE id = ${row.id}
-      `);
-    } else if (!(Array.isArray(row.images) && row.images.length > 0) && p.images.length > 0) {
-      await db.execute(sql`UPDATE portfolio_projects SET images = ${images}::jsonb, updated_at = NOW() WHERE id = ${row.id}`);
-    }
+    const cur = await db.execute(sql`SELECT * FROM portfolio_projects WHERE slug = ${p.slug}`);
+    const row = cur.rows[0] as Record<string, unknown> | undefined;
+    if (!row) { await insertSeedProject(p); continue; }
+    const previous = (row.seed_defaults as Partial<SeedDefaults> | null | undefined) ?? legacySeedDefaults(p.slug);
+    const next = mergeSeedProject(rowState(row), p, previous);
+    await db.execute(sql`
+      UPDATE portfolio_projects SET title = ${next.title}, client = ${next.client}, category = ${next.category},
+        summary = ${next.summary}, description = ${next.description}, status = ${next.status},
+        tech = ${JSON.stringify(next.tech)}::jsonb, features = ${JSON.stringify(next.features)}::jsonb,
+        live_url = ${next.liveUrl}, app_url = ${next.appUrl}, images = ${JSON.stringify(next.images)}::jsonb,
+        variants = ${JSON.stringify(next.variants)}::jsonb, sort_order = ${next.sortOrder},
+        seed_defaults = ${JSON.stringify(seedDefaultsOf(p))}::jsonb, updated_at = NOW()
+      WHERE id = ${Number(row.id)}
+    `);
   }
   await db.execute(sql`
     INSERT INTO portfolio_meta (key, value) VALUES ('seed_version', ${String(SEED_VERSION)})
     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
   `);
   logger.info({ version: SEED_VERSION }, "portfolio: lista de proyectos aplicada");
+}
+
+/**
+ * Filas de la semilla anteriores a seed_defaults: la base ya refleja la semilla actual (seed y
+ * patches aplicados), así que lo que la semilla ofrece hoy es su valor por defecto de referencia.
+ */
+export async function recordMissingSeedDefaults(): Promise<void> {
+  for (const p of SEED) {
+    await db.execute(sql`
+      UPDATE portfolio_projects SET seed_defaults = ${JSON.stringify(seedDefaultsOf(p))}::jsonb
+      WHERE slug = ${p.slug} AND seed_defaults IS NULL
+    `);
+  }
+}
+
+/** Anota en el registro de borrados los proyectos de la semilla que el dueño confirmó haber borrado antes de él. */
+export async function backfillPreLedgerDeletions(confirmed: readonly string[] = PRE_LEDGER_DELETED_SLUGS): Promise<string[]> {
+  if (!confirmed.length) return [];
+  const existing = await db.execute(sql`SELECT slug FROM portfolio_projects`);
+  const slugs = confirmedPreLedgerDeletions(confirmed, new Set((existing.rows as { slug: string }[]).map(r => r.slug)));
+  for (const slug of slugs) {
+    await db.execute(sql`INSERT INTO portfolio_deleted_projects (slug) VALUES (${slug}) ON CONFLICT (slug) DO NOTHING`);
+  }
+  if (slugs.length) logger.info({ slugs }, "portfolio: borrados anteriores al registro anotados");
+  return slugs;
 }
 
 function renamed(text: string): string {
@@ -170,13 +222,7 @@ export async function applyPatches(): Promise<void> {
     if (deletedSlugs.has(slug)) continue;
     const p = SEED.find(x => x.slug === slug);
     if (!p) continue;
-    await db.execute(sql`
-      INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, variants, sort_order)
-      VALUES (${p.slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${JSON.stringify(p.tech)}::jsonb,
-              ${JSON.stringify(p.features)}::jsonb, ${p.status}, ${p.liveUrl}, ${p.appUrl}, ${JSON.stringify(p.images)}::jsonb,
-              ${JSON.stringify(p.variants)}::jsonb, ${p.sortOrder})
-      ON CONFLICT (slug) DO NOTHING
-    `);
+    await insertSeedProject(p);
   }
   for (const [slug, prev] of Object.entries(PATCH_PREVIOUS)) {
     const seed = SEED.find(p => p.slug === slug);
@@ -267,19 +313,106 @@ function cleanText(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
 
-/** Borra el proyecto y registra su slug de forma atómica para protegerlo de futuras semillas. */
-export async function deletePortfolioProject(id: number): Promise<PortfolioImage[]> {
+/** Proyecto público: sin datos internos del panel (resultado QR de cada imagen). */
+function toPublicProject(r: Record<string, unknown>): PortfolioProject {
+  const p = toProject(r);
+  return { ...p, images: p.images.map(({ qrCheck: _qr, ...im }) => im) };
+}
+
+/**
+ * Borra el proyecto y, de forma atómica, registra su slug (para que ninguna semilla lo recree) junto
+ * con una copia completa de la fila, para poder restaurarlo desde el panel. Sus imágenes subidas se
+ * conservan mientras exista la copia; «Borrar definitivamente» las elimina.
+ */
+export async function deletePortfolioProject(id: number): Promise<boolean> {
   const result = await db.execute(sql`
     WITH removed AS (
-      DELETE FROM portfolio_projects WHERE id = ${id} RETURNING slug, images
+      DELETE FROM portfolio_projects WHERE id = ${id} RETURNING *
     ), recorded AS (
-      INSERT INTO portfolio_deleted_projects (slug)
-      SELECT slug FROM removed
-      ON CONFLICT (slug) DO NOTHING
+      INSERT INTO portfolio_deleted_projects (slug, project, deleted_at)
+      SELECT r.slug, to_jsonb(r), NOW() FROM removed r
+      ON CONFLICT (slug) DO UPDATE SET project = EXCLUDED.project, deleted_at = EXCLUDED.deleted_at
     )
-    SELECT images FROM removed
+    SELECT slug FROM removed
   `);
-  return ((result.rows[0] as { images?: PortfolioImage[] } | undefined)?.images) ?? [];
+  return result.rows.length > 0;
+}
+
+export interface DeletedPortfolioEntry {
+  slug: string; title: string; deletedAt: string | null;
+  /** snapshot = copia guardada al borrar · seed = se recrea desde la semilla · null = no restaurable. */
+  source: "snapshot" | "seed" | null;
+  published: boolean | null; imageCount: number;
+}
+
+/** Proyectos borrados (registro) y proyectos de la semilla ausentes y sin registro (a confirmar por el dueño). */
+export async function listDeletedPortfolio(): Promise<{ deleted: DeletedPortfolioEntry[]; unconfirmed: { slug: string; title: string }[] }> {
+  const ledger = await db.execute(sql`SELECT slug, deleted_at, project FROM portfolio_deleted_projects ORDER BY deleted_at DESC`);
+  const live = await db.execute(sql`SELECT slug FROM portfolio_projects`);
+  const liveSlugs = new Set((live.rows as { slug: string }[]).map(r => r.slug));
+  const deleted = (ledger.rows as { slug: string; deleted_at: unknown; project: Record<string, unknown> | null }[]).map(r => {
+    const seed = SEED.find(p => p.slug === r.slug);
+    const snap = r.project && typeof r.project === "object" ? toProject(r.project) : null;
+    return {
+      slug: r.slug,
+      title: snap?.title ?? seed?.title ?? r.slug,
+      deletedAt: r.deleted_at ? new Date(String(r.deleted_at)).toISOString() : null,
+      source: liveSlugs.has(r.slug) ? null : snap ? "snapshot" as const : seed ? "seed" as const : null,
+      published: snap ? snap.published : seed ? true : null,
+      imageCount: snap ? snap.images.length : seed?.images.length ?? 0,
+    };
+  });
+  const ledgerSlugs = new Set(deleted.map(d => d.slug));
+  const unconfirmed = SEED.filter(p => !liveSlugs.has(p.slug) && !ledgerSlugs.has(p.slug)).map(p => ({ slug: p.slug, title: p.title }));
+  return { deleted, unconfirmed };
+}
+
+/**
+ * Restaura un proyecto borrado y quita su marca de borrado en la misma sentencia. Usa la copia
+ * guardada al borrar (con su estado de publicación); si no la hay y es de la semilla, la recrea.
+ * Devuelve null si no es restaurable o si ya existe otro proyecto con ese slug.
+ */
+export async function restorePortfolioProject(slug: string): Promise<PortfolioProject | null> {
+  const cur = await db.execute(sql`SELECT project FROM portfolio_deleted_projects WHERE slug = ${slug}`);
+  const entry = cur.rows[0] as { project: Record<string, unknown> | null } | undefined;
+  if (!entry) return null;
+  const snap = entry.project && typeof entry.project === "object" ? entry.project : null;
+  const seed = SEED.find(p => p.slug === slug);
+  if (!snap && !seed) return null;
+  const p: PortfolioProject = snap ? toProject(snap) : {
+    id: 0, slug, title: seed!.title, client: seed!.client, category: seed!.category, summary: seed!.summary,
+    description: seed!.description, tech: seed!.tech, liveUrl: seed!.liveUrl, appUrl: seed!.appUrl, images: seed!.images,
+    sortOrder: seed!.sortOrder, published: true, features: seed!.features, status: seed!.status, variants: seed!.variants,
+  };
+  const defaults = snap ? (snap.seed_defaults ?? null) : seedDefaultsOf(seed!);
+  const r = await db.execute(sql`
+    WITH restored AS (
+      INSERT INTO portfolio_projects (slug, title, client, category, summary, description, tech, features, status, live_url, app_url, images, variants, sort_order, published, seed_defaults)
+      SELECT ${slug}, ${p.title}, ${p.client}, ${p.category}, ${p.summary}, ${p.description}, ${JSON.stringify(p.tech)}::jsonb,
+             ${JSON.stringify(p.features)}::jsonb, ${p.status}, ${p.liveUrl}, ${p.appUrl}, ${JSON.stringify(p.images)}::jsonb,
+             ${JSON.stringify(p.variants)}::jsonb, ${p.sortOrder}, ${p.published}, ${defaults === null ? null : JSON.stringify(defaults)}::jsonb
+      WHERE EXISTS (SELECT 1 FROM portfolio_deleted_projects WHERE slug = ${slug})
+      ON CONFLICT (slug) DO NOTHING
+      RETURNING *
+    ), unmarked AS (
+      DELETE FROM portfolio_deleted_projects WHERE slug IN (SELECT slug FROM restored)
+    )
+    SELECT * FROM restored
+  `);
+  const row = r.rows[0] as Record<string, unknown> | undefined;
+  return row ? toProject(row) : null;
+}
+
+/** Borra definitivamente la copia de un proyecto borrado y sus imágenes subidas. El slug sigue protegido. */
+export async function purgeDeletedPortfolioProject(slug: string): Promise<PortfolioImage[] | null> {
+  const r = await db.execute(sql`
+    WITH old AS (SELECT project FROM portfolio_deleted_projects WHERE slug = ${slug} FOR UPDATE)
+    UPDATE portfolio_deleted_projects d SET project = NULL FROM old WHERE d.slug = ${slug}
+    RETURNING old.project
+  `);
+  const row = r.rows[0] as { project: Record<string, unknown> | null } | undefined;
+  if (!row) return null;
+  return row.project ? toProject(row.project).images : [];
 }
 
 // ── Público ───────────────────────────────────────────────────────────────────
@@ -303,7 +436,7 @@ router.get("/portfolio", async (_req: Request, res: Response): Promise<void> => 
     await ensureTable();
     const r = await db.execute(sql`SELECT * FROM portfolio_projects WHERE published = TRUE ORDER BY sort_order, id`);
     res.setHeader("Cache-Control", "public, max-age=60");
-    res.json((r.rows as Record<string, unknown>[]).map(toProject));
+    res.json((r.rows as Record<string, unknown>[]).map(toPublicProject));
   } catch (err) {
     logger.error({ err }, "GET /portfolio");
     res.status(500).json({ error: "No se pudo cargar el portfolio" });
@@ -360,7 +493,10 @@ router.put("/admin/portfolio/:id", requireAdmin, async (req: Request, res: Respo
       // Solo se permite reordenar/editar el texto alternativo de imágenes ya subidas.
       ? (b.images as PortfolioImage[]).filter(im => p.images.some(x => x.url === im?.url)).map(im => {
           const prev = p.images.find(x => x.url === im.url)!;      // el tamaño es el de la imagen guardada, no el que mande el navegador
-          return { url: im.url, alt: cleanText(im.alt, 160), ...(prev.w && prev.h ? { w: prev.w, h: prev.h } : {}) };
+          return {
+            url: im.url, alt: cleanText(im.alt, 160), ...(prev.w && prev.h ? { w: prev.w, h: prev.h } : {}),
+            ...(prev.qrCheck ? { qrCheck: prev.qrCheck } : {}),          // el resultado QR solo lo escribe la subida
+          };
         })
       : p.images;
     const r = await db.execute(sql`
@@ -391,7 +527,58 @@ router.put("/admin/portfolio/:id", requireAdmin, async (req: Request, res: Respo
 router.delete("/admin/portfolio/:id", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     await ensureTable();
-    const images = await deletePortfolioProject(Number(req.params.id));
+    const removed = await deletePortfolioProject(Number(req.params.id));
+    if (!removed) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+router.get("/admin/portfolio/deleted", requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    await ensureTable();
+    res.json(await listDeletedPortfolio());
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+/** El dueño confirma que borró un proyecto de la semilla antes de que existiera el registro. */
+router.post("/admin/portfolio/deleted", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    await ensureTable();
+    const slug = cleanText(req.body?.slug, 60);
+    const recorded = await backfillPreLedgerDeletions([slug]);
+    if (!recorded.length) { res.status(400).json({ error: "Solo se puede marcar un proyecto de la semilla que no exista ahora" }); return; }
+    res.json({ ok: true, slug });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+router.post("/admin/portfolio/deleted/:slug/restore", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    await ensureTable();
+    const slug = String(req.params.slug);
+    const project = await restorePortfolioProject(slug);
+    if (!project) {
+      const taken = await db.execute(sql`SELECT id FROM portfolio_projects WHERE slug = ${slug}`);
+      if (taken.rows[0]) { res.status(409).json({ error: "Ya existe un proyecto con ese identificador" }); return; }
+      res.status(404).json({ error: "No hay copia restaurable de ese proyecto" });
+      return;
+    }
+    res.json(project);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Error" });
+  }
+});
+
+router.delete("/admin/portfolio/deleted/:slug", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    await ensureTable();
+    const images = await purgeDeletedPortfolioProject(String(req.params.slug));
+    if (!images) { res.status(404).json({ error: "No está en la lista de borrados" }); return; }
     for (const im of images) { const mid = mediaIdFromUrl(im.url); if (mid) await deleteMedia(mid).catch(() => {}); }
     res.json({ ok: true });
   } catch (err) {
@@ -415,7 +602,7 @@ router.post("/admin/portfolio/:id/images", requireAdmin, upload.array("files", 1
     }
     const qrArtwork = qrArtworkValue === "true";
     const qrChecks: QrArtworkFileCheck[] = [];
-    const preparedQrFiles = new Map<Express.Multer.File, { data: Buffer; width: number; height: number }>();
+    const preparedQrFiles = new Map<Express.Multer.File, { data: Buffer; width: number; height: number; checks?: QrArtworkSizeCheck[] }>();
     if (qrArtwork) {
       for (const file of files) {
         const filename = safeUploadName(file.originalname);
@@ -434,6 +621,7 @@ router.post("/admin/portfolio/:id/images", requireAdmin, upload.array("files", 1
           const prepared = { data: optimized.data, width: optimized.info.width, height: optimized.info.height };
           preparedQrFiles.set(file, prepared);
           const checks = await checkQrArtworkAtDisplaySizes(prepared.data);
+          preparedQrFiles.set(file, { ...prepared, checks });
           const passed = checks.length > 0 && checks.every(check => check.passed);
           qrChecks.push({
             filename,
@@ -458,13 +646,20 @@ router.post("/admin/portfolio/:id/images", requireAdmin, upload.array("files", 1
     for (const f of files) {
       if (!/^image\//.test(f.mimetype)) continue;
       // Se normaliza a WebP de hasta 2000 px: pesa poco y carga rápido en la landing.
-      let out = preparedQrFiles.get(f);
+      let out: { data: Buffer; width: number; height: number; checks?: QrArtworkSizeCheck[] } | undefined = preparedQrFiles.get(f);
       if (!out) {
         const optimized = await sharp(f.buffer).rotate().resize({ width: 2000, withoutEnlargement: true }).webp({ quality: 84 }).toBuffer({ resolveWithObject: true });
         out = { data: optimized.data, width: optimized.info.width, height: optimized.info.height };
       }
       const { url } = await saveMedia(out.data, "image/webp", { width: out.width, height: out.height, originalName: f.originalname });
-      added.push({ url, alt: safeUploadName(f.originalname).replace(/\.[^.]+$/, "").slice(0, 160), w: out.width, h: out.height });
+      const qrCheck: PortfolioQrCheck | undefined = qrArtwork && out.checks ? {
+        checks: out.checks, passed: true, checkedAt: new Date().toISOString(),
+        sha256: createHash("sha256").update(out.data).digest("hex"),
+      } : undefined;
+      added.push({
+        url, alt: safeUploadName(f.originalname).replace(/\.[^.]+$/, "").slice(0, 160), w: out.width, h: out.height,
+        ...(qrCheck ? { qrCheck } : {}),
+      });
     }
     if (!added.length) { res.status(400).json({ error: "Los archivos no son imágenes" }); return; }
     const r = await db.execute(sql`
