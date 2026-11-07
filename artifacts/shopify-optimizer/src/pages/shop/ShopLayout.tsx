@@ -64,7 +64,7 @@ export default function ShopLayout({ children }: { children: ReactNode }) {
     <div className="shop-root">
       <a href="#shop-main" className="shop-skip">Saltar al contenido</a>
       {!/\/tienda\/(carrito|gracias)/.test(typeof window !== "undefined" ? window.location.pathname : "") && <Link href="/tienda/tarjetas-metalicas" className="shop-promo">
-        <span>✦ Tarjetas de visita de aluminio desde <b>0,35 €</b></span>
+        <span>✦ Tarjetas de visita de aluminio desde <b>0,45 €</b></span>
         <span className="shop-promo-sep" aria-hidden="true">·</span>
         <span>Envío gratis desde 60 €</span>
         <span className="shop-promo-go">Pedir ahora →</span>
