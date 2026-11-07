@@ -58,15 +58,15 @@ describe("SCCursor", () => {
     });
     act(() => document.dispatchEvent(move));
     const ring = document.body.querySelector<HTMLElement>(".sc-cursor-ring");
-    expect(ring?.style.transform).toBe("translate3d(98px, 58px, 0)");
+    expect(ring?.style.translate).toBe("98px 58px");
     act(() => frame?.(0));
 
     const dot = document.body.querySelector<HTMLElement>(".sc-cursor");
     expect(document.documentElement.classList.contains("sc-cursor-on")).toBe(true);
     expect(dot?.classList.contains("sc-cursor-visible")).toBe(true);
     expect(ring?.classList.contains("sc-cursor-visible")).toBe(true);
-    expect(dot?.style.transform).toContain("106px");
-    expect(dot?.style.transform).toContain("66px");
+    expect(dot?.style.translate).toContain("106px");
+    expect(dot?.style.translate).toContain("66px");
 
     unmountCursor(root);
     expect(document.documentElement.classList.contains("sc-cursor-on")).toBe(false);
@@ -160,8 +160,8 @@ describe("SCCursor", () => {
     expect(document.documentElement.classList.contains("sc-cursor-on")).toBe(false);
     expect(dot?.classList.contains("sc-cursor-visible")).toBe(false);
     expect(ring?.classList.contains("sc-cursor-visible")).toBe(false);
-    expect(dot?.style.transform).toBe("");
-    expect(ring?.style.transform).toBe("");
+    expect(dot?.style.translate).toBe("");
+    expect(ring?.style.translate).toBe("");
 
     const returnMove = new Event("pointermove", { bubbles: true });
     Object.defineProperties(returnMove, {
@@ -170,8 +170,8 @@ describe("SCCursor", () => {
       pointerType: { value: "mouse" },
     });
     act(() => document.dispatchEvent(returnMove));
-    expect(dot?.style.transform).toBe("translate3d(66px, 46px, 0)");
-    expect(ring?.style.transform).toBe("translate3d(58px, 38px, 0)");
+    expect(dot?.style.translate).toBe("66px 46px");
+    expect(ring?.style.translate).toBe("58px 38px");
 
     act(() => root.unmount());
     host.remove();
