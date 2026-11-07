@@ -19,8 +19,11 @@ import { setupZipStream } from "../lib/zip-stream.js";
 import archiver from "archiver";
 import { searchCybersecSkills } from "../lib/cybersec-knowledge.js";
 import { sanitizeHtml as escapeHtml } from "../lib/html-escape.js";
+import webLabSkillsRouter from "./web-lab-skills.js";
 
 const router = Router();
+// Skills seleccionables y ejecutables del Web Lab (catálogo + ejecución real).
+router.use(webLabSkillsRouter);
 
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 const VALID_TEMPLATES = new Set<ReportTemplate>(["classic", "elegance", "prestige"]);
