@@ -9,6 +9,7 @@ import { aiOutputErrorMessage, isAiOutputError } from "../lib/ai-errors.js";
 import { z } from "zod";
 import { shopifyRequest, shopifyRequestPaged } from "../lib/shopify.js";
 import { getConnector } from "../lib/connectors/index";
+import { wooOrderToSalesShape, type WooCommerceConnector } from "../lib/connectors/woocommerce.js";
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import { generatePdfFromHtml } from "../lib/pdf-generator.js";
@@ -337,34 +338,12 @@ router.post("/inventory/sync-orders", async (req, res): Promise<void> => {
       let orders: OrderShape[] = [];
       let pagesFetched = 0;
       if (isWoo) {
-        const connector = getConnector(project);
-        const wcOrders = await connector.getOrders();
-        orders = wcOrders.map((o) => ({
-          id: parseInt(o.platformId) || 0,
-          name: o.orderNumber,
-          created_at: o.createdAt,
-          customer: o.customerEmail ? {
-            id: 0,
-            email: o.customerEmail,
-            first_name: "",
-            last_name: "",
-          } : undefined,
-          line_items: o.lineItems.map((li) => ({
-            product_id: parseInt(li.productId ?? "0") || 0,
-            variant_id: 0,
-            title: li.title,
-            variant_title: "Default",
-            sku: "",
-            quantity: li.quantity,
-            price: li.price,
-            total_discount: "0",
-            fulfillment_status: null as string | null,
-          })),
-          financial_status: o.status,
-          fulfillment_status: null,
-          shipping_address: undefined,
-          currency: o.currency,
-        }));
+        // Antes: connector.getOrders() sin página → solo los 100 pedidos más recientes, sin
+        // variación, SKU, descuentos ni envío. Ahora se leen TODAS las páginas.
+        const connector = getConnector(project) as WooCommerceConnector;
+        const wcOrders = await connector.getAllOrders();
+        pagesFetched = Math.max(1, Math.ceil(wcOrders.length / 100));
+        orders = wcOrders.map(wooOrderToSalesShape);
       } else {
         // Shopify: cursor-based pagination over ALL orders (status=any) with refunds embedded
         const FIELDS = "id,name,created_at,customer,line_items,financial_status,fulfillment_status,shipping_address,currency,refunds";
@@ -555,7 +534,7 @@ router.post("/inventory/sync-refunds", async (req, res): Promise<void> => {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
     if (!project) { res.status(404).json({ error: "Project not found" }); return; }
     if (project.platformType === "woocommerce") {
-      res.status(400).json({ error: "WooCommerce no soportado todavía para sync-refunds" }); return;
+      res.status(400).json({ error: "La sincronización de reembolsos aún no está conectada para WooCommerce (su API sí los expone en /orders/{id}/refunds)" }); return;
     }
     if (!project.accessToken) { res.status(400).json({ error: "No access token" }); return; }
 

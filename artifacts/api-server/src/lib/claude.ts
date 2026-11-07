@@ -551,7 +551,7 @@ export async function buildShopyBrainContext(
 
     if (platformType && platformType !== "shopify") {
       const platformNotes: Record<string, string> = {
-        woocommerce: "Platform: WooCommerce (WordPress). Uses WC REST API v3 with HTTP Basic Auth. SEO via Yoast SEO plugin (yoast_head_json). Product types: simple/variable/grouped/external. Status mapping: publish=active, draft=draft, private=archived. Images via src URLs. Variations require parent product attributes with variation:true.",
+        woocommerce: "Platform: WooCommerce (WordPress). WC REST API v3 with Consumer Key/Secret over HTTPS (Basic Auth). Lists paginate with per_page<=100 and X-WP-Total/X-WP-TotalPages. Prices are strings (price=active, regular_price, sale_price; may be empty = not purchasable, never 0). Variable products keep price and stock in /products/{id}/variations. stock_quantity is null when manage_stock is off (not 0); use stock_status (instock/outofstock/onbackorder). WooCommerce has no SEO fields: Yoast SEO or Rank Math store them as product meta_data (_yoast_wpseo_title/_yoast_wpseo_metadesc or rank_math_title/rank_math_description). Product types: simple/variable/grouped/external (the platform creates simple and variable). Status mapping: publish=active, draft=draft, private=archived. Images: new ones via src URL (sideloaded), existing ones by media id. Variations require parent attributes with variation:true.",
         prestashop: "Platform: PrestaShop. Uses PrestaShop Webservice API with XML/JSON. SEO via native meta fields.",
       };
       lines.push(`🔧 Plataforma: ${platformType.toUpperCase()}`);
@@ -880,7 +880,7 @@ export async function buildSmartBrainContext(
 
     if (platformType && platformType !== "shopify") {
       const platformNotes: Record<string, string> = {
-        woocommerce: "Plataforma: WooCommerce. API: WC REST v3, Basic Auth. SEO: Yoast/RankMath. Status: publish/draft/private.",
+        woocommerce: "Plataforma: WooCommerce. API: WC REST v3 (Consumer Key/Secret, HTTPS). Precio y stock de los variables en cada variación; stock_quantity null = sin gestionar, no 0. SEO: metadatos de Yoast/Rank Math (WooCommerce no tiene campos SEO propios). Status: publish/draft/private.",
         prestashop: "Plataforma: PrestaShop. API: Webservice XML/JSON. SEO: URL amigables + meta tags nativos. Stock: stock_availables.",
         universal: "Plataforma: Auditoría Universal (web genérica). Sin gestión de productos — solo análisis SEO, diseño, PageSpeed.",
       };

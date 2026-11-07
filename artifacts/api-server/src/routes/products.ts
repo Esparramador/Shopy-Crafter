@@ -1157,9 +1157,23 @@ router.put("/projects/:projectId/products/:productId", async (req, res): Promise
         if (updates.tags !== undefined) wcData.tags = updates.tags;
         if (updates.status !== undefined) wcData.status = updates.status;
         if (updates.handle !== undefined) wcData.handle = updates.handle;
-        if (updates.price !== undefined) wcData.price = updates.price;
-        if (updates.compareAtPrice !== undefined) wcData.compareAtPrice = updates.compareAtPrice;
         if (updates.images !== undefined) wcData.images = updates.images;
+        // En WooCommerce un producto variable no tiene precio propio: si llegan variantes con ID,
+        // el precio/SKU se escribe en cada variación y no en el padre.
+        const wcVariants = Array.isArray(updates.variants)
+          ? (updates.variants as Array<Record<string, unknown>>).filter(v => v.id !== undefined && v.id !== null && v.id !== "")
+          : [];
+        if (wcVariants.length > 0) {
+          await (connector as WooCommerceConnector).updateVariations(shopifyProductId, wcVariants.map(v => ({
+            id: v.id as string | number,
+            price: v.price !== undefined ? String(v.price) : undefined,
+            compareAtPrice: v.compareAtPrice !== undefined && v.compareAtPrice !== null ? String(v.compareAtPrice) : null,
+            sku: v.sku !== undefined ? String(v.sku) : undefined,
+          })));
+        } else {
+          if (updates.price !== undefined) wcData.price = updates.price;
+          if (updates.compareAtPrice !== undefined) wcData.compareAtPrice = updates.compareAtPrice;
+        }
   
         const updated = await connector.updateProduct(shopifyProductId, wcData as Partial<PlatformProduct>);
   
@@ -1862,7 +1876,8 @@ router.post("/projects/:projectId/products/create", async (req, res): Promise<vo
             price: (v.price as string) || "0.00",
             compareAtPrice: (v.compareAtPrice as string) || null,
             sku: (v.sku as string) || "",
-            inventoryQuantity: (v.quantity as number) ?? 0,
+            // Sin cantidad no se gestiona stock: un 0 por defecto crearía la variación agotada.
+            inventoryQuantity: typeof v.quantity === "number" ? v.quantity : undefined,
             option1: v.option1 as string | undefined,
             option2: v.option2 as string | undefined,
             option3: v.option3 as string | undefined,
