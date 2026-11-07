@@ -8,6 +8,19 @@
 .lx-center { display: flex; justify-content: center; margin-top: 22px; }
 .lx-note { text-align: center; font-size: 13px; color: var(--l-t2); margin: 18px 0 0; }
 
+/* Spotlight del cursor, en una capa visual que nunca bloquea interacciones. */
+.fp-cursor-glow {
+  position: fixed; inset: 0 auto auto 0; width: 340px; height: 340px; border-radius: 50%;
+  z-index: 999; pointer-events: none; opacity: 0;
+  transform: translate3d(calc(var(--cursor-x, -1000px) - 50%), calc(var(--cursor-y, -1000px) - 50%), 0);
+  background: radial-gradient(circle, rgba(200,168,75,.13) 0%, rgba(200,168,75,.055) 30%, transparent 70%);
+  mix-blend-mode: screen; will-change: transform; transition: opacity .2s ease;
+}
+.fp-cursor-glow.is-visible { opacity: 1; }
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .fp-cursor-glow { display: none; }
+}
+
 .lx-link {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 13px; font-weight: 600; color: var(--l-gold2);
@@ -16,6 +29,11 @@
 }
 .lx-link:hover { color: var(--l-gold3); transform: translateX(2px); }
 
+/* Separación visible entre el bloque anterior y el vídeo/formulario de contacto. */
+#fp-contact.fp-section { margin-top: clamp(24px, 4vh, 48px); }
+@media (max-width: 900px) {
+  #fp-contact.fp-section { margin-top: 24px; }
+}
 /* ── HERO: hechos verificables ─────────────────────────────────────── */
 .lx-facts {
   position: relative; z-index: 2;
@@ -43,7 +61,7 @@
 @keyframes lx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 
 /* ── SERVICIOS ─────────────────────────────────────────────────────── */
-.lx-services { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.lx-services { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .lx-service {
   --lx-accent: var(--l-gold);
   position: relative; display: flex; flex-direction: column;

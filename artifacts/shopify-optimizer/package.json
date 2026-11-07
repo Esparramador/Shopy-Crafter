@@ -15,6 +15,7 @@
     "e2e:client-chatbot-layout": "node e2e/client-chatbot-layout.e2e.mjs",
     "e2e:admin-delete-client": "node e2e/admin-delete-client.e2e.mjs",
     "e2e:admin-modal-overlay": "node e2e/admin-modal-overlay.e2e.mjs",
+    "e2e:convai-reset-selection": "node e2e/convai-reset-selection.e2e.mjs",
     "e2e:contacto-footer": "node e2e/contacto-footer.e2e.mjs",
     "e2e:voice-tuning": "node e2e/convai-voice-tuning.e2e.mjs"
   },

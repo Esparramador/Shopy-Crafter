@@ -20,6 +20,7 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
+import { sendContactRequest } from "@/lib/contact-request";
 
 const BASE_URL   = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const VIDEO_SRC  = `${BASE_URL}/assets/videos/alec_landing.mp4`;
@@ -65,7 +66,13 @@ const EMPTY: ContactForm = {
 };
 const NICHES   = ["Moda y ropa","Electrónica y gadgets","Hogar y decoración","Belleza y cosmética","Deporte y fitness","Alimentación y gourmet","Arte y coleccionismo","Mascotas","Joyería y accesorios","Otro"];
 const REVENUES = ["Menos de €1.000","€1.000 – €5.000","€5.000 – €15.000","€15.000 – €50.000","Más de €50.000"];
-const SERVICES = ["SEO y contenido","Rediseño de producto","Imágenes IA","Pricing y márgenes","Email marketing","A/B Testing","Auditoría completa"];
+const SERVICES = [
+  "SEO y contenido", "Rediseño de producto", "Imágenes IA", "Pricing y márgenes",
+  "Email marketing", "A/B Testing", "Auditoría completa",
+  "Asistente virtual para WhatsApp y teléfono", "Chatbot para landing o web",
+  "Agente de IA a medida con skills", "App personalizada para el agente",
+  "Perfil de Empresa de Google", "Campañas de Google Ads",
+];
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const labelSt: React.CSSProperties = {
@@ -104,6 +111,7 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
   // Video / build state
   const [formReady,  setFormReady]  = useState(false);
   const [buildPhase, setBuildPhase] = useState(0);   // 0..5
+  const formFallbackRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef  = useRef<HTMLDivElement>(null);
 
@@ -114,12 +122,22 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
     setStatus(st => (st === "sent" ? "idle" : st));
   }, [prefill?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // El formulario no debe quedar oculto si el vídeo no carga o no puede avanzar.
+  useEffect(() => {
+    if (formReady) return;
+    const timeout = window.setTimeout(() => {
+      formFallbackRef.current = true;
+      setFormReady(true);
+    }, 6500);
+    return () => window.clearTimeout(timeout);
+  }, [formReady]);
+
   // isActive prop — play/pause based on whether the landing section is active
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     if (isActive) {
-      v.play().catch(() => {});
+      v.play().catch(() => setFormReady(true));
     } else {
       v.pause();
     }
@@ -131,13 +149,21 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
       ([entry]) => {
         const v = videoRef.current;
         if (!v) return;
-        entry.isIntersecting ? v.play().catch(() => {}) : v.pause();
+        entry.isIntersecting ? v.play().catch(() => setFormReady(true)) : v.pause();
       },
       { threshold: 0.10 }
     );
     if (rootRef.current) obs.observe(rootRef.current);
     return () => obs.disconnect();
   }, []);
+
+  // Media is decorative: blocked autoplay, a stalled download or a short video
+  // must never prevent a visitor from reaching the actual contact form.
+  useEffect(() => {
+    if (!isActive || formReady) return;
+    const timer = setTimeout(() => setFormReady(true), 6500);
+    return () => clearTimeout(timer);
+  }, [isActive, formReady]);
 
   // timeupdate — trigger form at t=4.5s
   useEffect(() => {
@@ -160,6 +186,10 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
   // Build phases cascade (starts when formReady becomes true)
   useEffect(() => {
     if (!formReady) return;
+    if (formFallbackRef.current) {
+      setBuildPhase(5);
+      return;
+    }
     setBuildPhase(1);
     const t2 = setTimeout(() => setBuildPhase(2), 1450);  // Name+Email
     const t3 = setTimeout(() => setBuildPhase(3), 2150);  // Phone
@@ -182,22 +212,19 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
     if (status === "sending") return;
     setStatus("sending"); setErrMsg("");
     try {
-      let res: Response;
       if (refFile) {
         const fd = new FormData();
         Object.entries(form).forEach(([k, v]) => fd.append(k, v));
         fd.append("services", JSON.stringify(services));
         fd.append("referenceImage", refFile);
-        res = await fetch(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
+        await sendContactRequest(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd }, "public-contact");
       } else {
-        res = await fetch(`${BASE_URL}/api/contact`, {
+        await sendContactRequest(`${BASE_URL}/api/contact`, {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...form, services }),
-        });
+        }, "public-contact");
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Error al enviar");
       setStatus("sent");
     } catch (err: unknown) {
       setStatus("error");
@@ -440,6 +467,7 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
           muted
           playsInline
           preload="metadata"
+          onError={() => setFormReady(true)}
         />
 
         {/* ── Gradient overlay ──────────────────────────────────────────────── */}
@@ -494,6 +522,9 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
               <p style={{ margin: 0, fontSize: 12.5, fontStyle: "italic", lineHeight: 1.55 }}>
                 Observa cómo Alec<br />sale del cuadro…
               </p>
+              <button type="button" onClick={() => setFormReady(true)} style={{ color: "var(--gold, #c8a84b)", background: "none", border: 0, cursor: "pointer", minHeight: 44, textDecoration: "underline" }}>
+                Abrir formulario sin esperar
+              </button>
             </div>
           )}
 

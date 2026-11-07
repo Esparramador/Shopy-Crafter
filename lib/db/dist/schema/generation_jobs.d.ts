@@ -282,6 +282,7 @@ export declare const insertGenerationJobSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodString>;
     projectId: z.ZodInt;
     shopifyProductId: z.ZodString;
+    completedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
     imageType: z.ZodString;
     prompt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     negativePrompt: z.ZodOptional<z.ZodNullable<z.ZodString>>;
@@ -292,7 +293,6 @@ export declare const insertGenerationJobSchema: z.ZodObject<{
     altText: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     estimatedCost: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
     errorMessage: z.ZodOptional<z.ZodNullable<z.ZodString>>;
-    completedAt: z.ZodOptional<z.ZodNullable<z.ZodDate>>;
 }, {
     out: {};
     in: {};

@@ -121,8 +121,10 @@ body::after {
   background: linear-gradient(135deg, var(--gold), var(--gold2, #e6c668));
   border-radius: 50%;
   position: fixed;
+  top: 0;
+  left: 0;
   pointer-events: none;
-  z-index: 10002;
+  z-index: 2147483647;
   display: flex; align-items: center; justify-content: center;
   font-family: var(--fb, 'Geist', sans-serif);
   font-size: 9px; font-weight: 800;
@@ -130,18 +132,23 @@ body::after {
   letter-spacing: 0.3px;
   mix-blend-mode: normal;
   opacity: 0.95;
-  left: 0; top: 0; /* se mueve con transform: sin esto se queda donde caiga en el flujo, fuera de pantalla */
-  transition: scale 0.15s ease;
+  opacity: 0;
+  transition: opacity 0.08s ease, scale 0.15s ease;
 }
 .sc-cursor-ring {
   width: 44px; height: 44px;
   border: 1.5px solid rgba(200,168,75,0.35);
   border-radius: 50%;
   position: fixed;
+  top: 0;
+  left: 0;
   pointer-events: none;
-  z-index: 10001;
-  left: 0; top: 0;
-  transition: scale 0.12s ease, border-color 0.12s ease, width 0.2s ease, height 0.2s ease;
+  z-index: 2147483646;
+  opacity: 0;
+  transition: opacity 0.08s ease, border-color 0.12s ease, scale 0.2s ease;
+}
+.sc-cursor-visible {
+  opacity: 1;
 }
 .sc-ring-hover {
   scale: 1.6;
@@ -1314,8 +1321,15 @@ body[data-modal-open] .floating-widget { visibility: hidden; pointer-events: non
   --sidebar-accent-foreground:  233 18% 8%;
 }
 
-/* ── TOUCH DEVICE: disable custom cursor ── */
-@media (hover: none), (pointer: coarse) {
+/* ── Cursor personalizado: ocultar el puntero del sistema solo tras mover uno fino ── */
+html.sc-cursor-on,
+html.sc-cursor-on body,
+html.sc-cursor-on body * {
+  cursor: none !important;
+}
+
+/* En pantallas táctiles sin ratón se conserva el puntero/gesto nativo. */
+@media (any-hover: none) and (any-pointer: coarse) {
   body { cursor: auto !important; }
   a, button, input, select, textarea, [role="button"] { cursor: auto !important; }
   .sc-cursor, .sc-cursor-ring { display: none !important; }

@@ -1,409 +1,137 @@
-/**
- * woo-project.ts — WooCommerce Project Admin Hub API
- * ─────────────────────────────────────────────────────
- * Rutas de gestión admin por proyecto WooCommerce:
- *   GET  /admin/woo/project/:id/overview     → Revenue, orders, productos, stock
- *   GET  /admin/woo/project/:id/orders       → Lista paginada de pedidos
- *   GET  /admin/woo/project/:id/products     → Catálogo de productos
- *   GET  /admin/woo/project/:id/customers    → Lista de clientes
- *   GET  /admin/woo/project/:id/coupons      → Cupones activos
- *   GET  /admin/woo/project/:id/inventory    → Alertas de stock
- *   PUT  /admin/woo/project/:id/products/:pid → Actualizar producto
- */
-
 import { Router, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
+import { db, projectsTable } from "@workspace/db";
 import { requireAdmin } from "../lib/auth.js";
-import { logger } from "../lib/logger.js";
-import { safeDecrypt } from "../lib/crypto.js";
+import { WooClient, WooError, wooId } from "../lib/woo-client.js";
+import { wooOverview, wooInventory } from "../lib/woo-metrics.js";
+import { wooResources, wooResourcePath, wooSchema, wooEditableFields, verifiedWooWrite, type WooResource } from "../lib/woo-catalog.js";
+import { CreateWooResourceBody, UpdateWooResourceBody, RequestWooUploadBody, PreviewWooFilesBody, ApplyWooFilesBody } from "@workspace/api-zod";
+import { getWooJson, wooUpload, wooObject } from "../lib/woo-storage.js";
+import { previewWooImport, applyWooImport, wooImportPreviews } from "../lib/woo-imports.js";
 
 const router = Router();
-
-// ── Helper: carga proyecto WooCommerce y prepara clientes ────────────────────
-async function resolveWoo(projectId: number) {
-  const { db, projectsTable } = await import("@workspace/db");
-  const project = await db.query.projectsTable.findFirst({
-    where: eq(projectsTable.id, projectId),
-  });
-  if (!project) throw Object.assign(new Error("Proyecto no encontrado"), { status: 404 });
-  if (project.platformType !== "woocommerce")
-    throw Object.assign(new Error("Este proyecto no es WooCommerce"), { status: 400 });
-
-  // Credenciales
-  const consumerKey    = safeDecrypt(project.clientId)     || project.clientId;
-  const consumerSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-  const authHeader = `Basic ${Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64")}`;
-
-  // Base URL
-  let domain = (project.shopDomain || "").trim().replace(/\/+$/, "");
-  if (!domain.startsWith("https://") && !domain.startsWith("http://")) domain = `https://${domain}`;
-  if (domain.startsWith("http://")) domain = domain.replace("http://", "https://");
-  const wcApi = `${domain}/wp-json/wc/v3`;
-
-  async function wcGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-    const resp = await fetch(`${wcApi}${path}`, {
-      headers: { Authorization: authHeader, "Content-Type": "application/json" },
-      signal: signal ?? AbortSignal.timeout(30_000),
-    });
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => "");
-      throw new Error(`WC ${resp.status}: ${body.slice(0, 200)}`);
-    }
-    return resp.json() as Promise<T>;
-  }
-
-  async function wcPut<T>(path: string, data: unknown): Promise<T> {
-    const resp = await fetch(`${wcApi}${path}`, {
-      method: "PUT",
-      headers: { Authorization: authHeader, "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => "");
-      throw new Error(`WC PUT ${resp.status}: ${body.slice(0, 200)}`);
-    }
-    return resp.json() as Promise<T>;
-  }
-
-  return { project, wcGet, wcPut, domain };
+const base = "/admin/woo/project/:id";
+export async function resolveWooClient(projectId: number) {
+  const project = await db.query.projectsTable.findFirst({where:eq(projectsTable.id,projectId)});
+  if (!project) throw new WooError("Proyecto no encontrado",404);
+  if (project.platformType !== "woocommerce") throw new WooError("El proyecto no es WooCommerce",400);
+  return new WooClient(project);
 }
-
-// ── Normaliza formato de moneda ──────────────────────────────────────────────
-function fmtMoney(val: unknown): number {
-  const n = parseFloat(String(val ?? "0"));
-  return isNaN(n) ? 0 : n;
-}
-
-// ── GET /admin/woo/project/:id/overview ─────────────────────────────────────
-router.get(
-  "/admin/woo/project/:id/overview",
-  requireAdmin,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const projectId = Number(req.params.id);
-      const { wcGet } = await resolveWoo(projectId);
-
-      // Lanzar en paralelo para velocidad
-      const [salesResult, ordersResult, productsResult, stockResult] = await Promise.allSettled([
-        wcGet<any>("/reports/sales?period=month"),
-        wcGet<any[]>("/orders?per_page=5&orderby=date&order=desc"),
-        wcGet<any[]>("/reports/products/totals"),
-        wcGet<any[]>("/products?per_page=50&stock_status=outofstock,onbackorder"),
-      ]);
-
-      const settled = [salesResult, ordersResult, productsResult, stockResult];
-      const failures = settled
-        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
-        .map(r => String(r.reason?.message ?? r.reason ?? "error"));
-      // Si no responde ninguna llamada, la tienda no es accesible: error explícito, no ceros.
-      if (failures.length === settled.length) {
-        res.status(502).json({ error: `No se pudo conectar con WooCommerce: ${failures[0]}` });
-        return;
-      }
-
-      const sales     = salesResult.status    === "fulfilled" ? salesResult.value    : null;
-      const orders    = ordersResult.status   === "fulfilled" ? ordersResult.value   : [];
-      const prodTotals= productsResult.status === "fulfilled" ? productsResult.value : [];
-      const lowStock  = stockResult.status    === "fulfilled" ? stockResult.value    : [];
-
-      // Calcular total de productos
-      const totalProducts = Array.isArray(prodTotals)
-        ? prodTotals.reduce((s: number, t: any) => s + (t.total ?? 0), 0)
-        : 0;
-
-      res.json({
-        revenue30d:    fmtMoney(sales?.total_sales),
-        orders30d:     sales?.total_orders ?? 0,
-        aov:           fmtMoney(sales?.average_sales),
-        refunds30d:    fmtMoney(sales?.total_refunds),
-        totalProducts,
-        lowStockCount: lowStock.length,
-        currency:      sales?.currency ?? "EUR",
-        // Datos que WooCommerce no devolvió (las cifras afectadas no son fiables).
-        warnings:      failures,
-        recentOrders:  (orders as any[]).map((o: any) => ({
-          id:           o.id,
-          number:       o.number,
-          status:       o.status,
-          total:        fmtMoney(o.total),
-          currency:     o.currency,
-          customerName: `${o.billing?.first_name ?? ""} ${o.billing?.last_name ?? ""}`.trim() || "—",
-          email:        o.billing?.email ?? "",
-          date:         o.date_created,
-          itemCount:    o.line_items?.length ?? 0,
-        })),
-        stockAlerts: (lowStock as any[]).slice(0, 8).map((p: any) => ({
-          id:        p.id,
-          name:      p.name,
-          sku:       p.sku,
-          stock:     p.stock_quantity,
-          status:    p.stock_status,
-          price:     fmtMoney(p.price),
-        })),
-      });
-    } catch (err: any) {
-      logger.error("WOO overview error", err);
-      res.status(err.status ?? 500).json({ error: err.message });
+const handler = (fn: (req:Request,res:Response,wc:WooClient)=>Promise<void>) =>
+  async (req:Request,res:Response):Promise<void> => {
+    try { await fn(req,res,await resolveWooClient(wooId(req.params.id))); }
+    catch (e:any) {
+      req.log?.warn({projectId:Number(req.params.id),status:e instanceof WooError ? e.status : 502},"WooCommerce operation failed");
+      res.status(e instanceof WooError ? e.status : 502).json({error:e instanceof WooError ? e.message : "No se pudo completar la operación WooCommerce. No repetir una escritura sin comprobar el resultado."});
     }
+  };
+const resource = (req:Request) => {
+  const r = String(req.params.resource) as WooResource;
+  if (!wooResources.includes(r)) throw new WooError("Recurso no admitido",400);
+  return r;
+};
+const parent = (req:Request) => req.query.parentId != null ? wooId(req.query.parentId) : req.body?.parentId != null ? wooId(req.body.parentId) : undefined;
+const pathFor = (req:Request) => wooResourcePath(resource(req),parent(req));
+// No router-wide auth without a prefix: public media must remain before the global admin gate.
+router.get("/woo-media/:projectId/:token",async(req,res):Promise<void>=>{
+  try {
+    const pid = wooId(req.params.projectId), token=String(req.params.token);
+    if (!/^[a-f0-9-]{36}$/.test(token)) {res.sendStatus(404);return;}
+    const meta = await getWooJson(pid,`published/${token}.json`);
+    const file = wooObject(pid,`published/${token}`);
+    const [metadata] = await file.getMetadata();
+    res.set({"Content-Type":meta.mime,"Content-Length":String(metadata.size),"X-Content-Type-Options":"nosniff","Content-Security-Policy":"sandbox; default-src 'none'","Cache-Control":"public, max-age=31536000, immutable",...(meta.mime==="application/pdf" ? {"Content-Disposition":"attachment"} : {})});
+    file.createReadStream().on("error",()=>res.destroy()).pipe(res);
+  } catch {res.sendStatus(404);}
+});
+router.use(base,requireAdmin);
+router.get(`${base}/overview`,handler(async(_req,res,wc)=>{res.json(await wooOverview(wc));}));
+router.get(`${base}/inventory`,handler(async(_req,res,wc)=>{
+  const settings = await wc.request("GET","/settings/general");
+  const currency=settings.find((s:any)=>s.id==="woocommerce_currency")?.value;
+  if (!currency) throw new WooError("Moneda no disponible");
+  res.json({...await wooInventory(wc),currency,source:wc.origin,fetchedAt:new Date().toISOString()});
+}));
+router.get(`${base}/resources/:resource`,handler(async(req,res,wc)=>{
+  const page=wooId(req.query.page ?? 1), perPage=wooId(req.query.per_page ?? 20);
+  if (perPage>100) throw new WooError("Máximo 100 registros por página",400);
+  const query:Record<string,string>={page:String(page),per_page:String(perPage)};
+  if (req.query.search) query.search=String(req.query.search).slice(0,200);
+  if (req.query.status) {
+    const status=String(req.query.status), r=resource(req);
+    const allowed=r==="orders" ? ["pending","processing","on-hold","completed","cancelled","refunded","failed","trash"] : ["publish","draft","pending","private","future","trash"];
+    if (!["orders","products","variations"].includes(r) || !allowed.includes(status)) throw new WooError("Filtro de estado inválido; selecciona un solo estado",400);
+    query.status=status;
   }
-);
-
-// ── GET /admin/woo/project/:id/orders ───────────────────────────────────────
-router.get(
-  "/admin/woo/project/:id/orders",
-  requireAdmin,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const projectId = Number(req.params.id);
-      const { wcGet } = await resolveWoo(projectId);
-      const page     = req.query.page     ?? "1";
-      const perPage  = req.query.per_page ?? "20";
-      const status   = req.query.status   ?? "";
-      const search   = req.query.search   ?? "";
-
-      let path = `/orders?page=${page}&per_page=${perPage}&orderby=date&order=desc`;
-      if (status) path += `&status=${status}`;
-      if (search) path += `&search=${encodeURIComponent(String(search))}`;
-
-      const orders = await wcGet<any[]>(path);
-
-      res.json({
-        orders: orders.map((o: any) => ({
-          id:           o.id,
-          number:       o.number,
-          status:       o.status,
-          total:        fmtMoney(o.total),
-          currency:     o.currency,
-          customerName: `${o.billing?.first_name ?? ""} ${o.billing?.last_name ?? ""}`.trim() || "—",
-          email:        o.billing?.email ?? "",
-          phone:        o.billing?.phone ?? "",
-          date:         o.date_created,
-          datePaid:     o.date_paid,
-          paymentMethod:o.payment_method_title ?? "",
-          itemCount:    o.line_items?.length ?? 0,
-          items:        (o.line_items ?? []).map((li: any) => ({
-            name:     li.name,
-            qty:      li.quantity,
-            total:    fmtMoney(li.total),
-          })),
-          shippingTotal: fmtMoney(o.shipping_total),
-          note:          o.customer_note ?? "",
-        })),
-      });
-    } catch (err: any) {
-      logger.error("WOO orders error", err);
-      res.status(err.status ?? 500).json({ error: err.message });
-    }
+  // Validate filters against this installation, not an assumed comma-separated enum.
+  const args = await wooSchema(wc,pathFor(req),"GET");
+  // Core product attributes is an explicitly unpaginated collection. Do not invent
+  // upstream filters or demand pagination headers that the resource does not expose.
+  if (resource(req)==="attributes" && !args.page && !args.per_page) {
+    let data=await wc.request("GET",pathFor(req));
+    if (!Array.isArray(data) || data.length>5000) throw new WooError("Listado de atributos inválido o superior al límite");
+    if(query.search) data=data.filter((a:any)=>String(a.name).toLocaleLowerCase().includes(query.search.toLocaleLowerCase()));
+    const total=data.length;
+    res.json({data:data.slice((page-1)*perPage,page*perPage),total,totalPages:Math.ceil(total/perPage),page,hasMore:page*perPage<total,source:wc.origin,fetchedAt:new Date().toISOString()});
+    return;
   }
-);
-
-// ── GET /admin/woo/project/:id/products ─────────────────────────────────────
-router.get(
-  "/admin/woo/project/:id/products",
-  requireAdmin,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const projectId = Number(req.params.id);
-      const { wcGet } = await resolveWoo(projectId);
-      const page    = req.query.page     ?? "1";
-      const perPage = req.query.per_page ?? "20";
-      const search  = req.query.search   ?? "";
-      const status  = req.query.status   ?? "";
-
-      let path = `/products?page=${page}&per_page=${perPage}&orderby=date&order=desc`;
-      if (search) path += `&search=${encodeURIComponent(String(search))}`;
-      if (status) path += `&status=${status}`;
-
-      const products = await wcGet<any[]>(path);
-
-      res.json({
-        products: products.map((p: any) => ({
-          id:             p.id,
-          name:           p.name,
-          sku:            p.sku,
-          status:         p.status,
-          stockStatus:    p.stock_status,
-          stockQuantity:  p.stock_quantity,
-          price:          fmtMoney(p.price),
-          regularPrice:   fmtMoney(p.regular_price),
-          salePrice:      p.sale_price ? fmtMoney(p.sale_price) : null,
-          type:           p.type,
-          categories:     (p.categories ?? []).map((c: any) => c.name),
-          totalSales:     p.total_sales ?? 0,
-          date:           p.date_created,
-          image:          p.images?.[0]?.src ?? null,
-          variationCount: p.variations?.length ?? 0,
-          permalink:      p.permalink ?? "",
-        })),
-      });
-    } catch (err: any) {
-      logger.error("WOO products error", err);
-      res.status(err.status ?? 500).json({ error: err.message });
-    }
+  if (args.hide_empty) query.hide_empty="false";
+  for (const [k,v] of Object.entries(query)) {
+    if (!args[k]) throw new WooError(`La tienda no admite el filtro ${k}`,400);
+    if (args[k].enum && !args[k].enum.includes(v)) throw new WooError(`Valor no admitido para ${k}`,400);
   }
-);
-
-// ── GET /admin/woo/project/:id/customers ────────────────────────────────────
-router.get(
-  "/admin/woo/project/:id/customers",
-  requireAdmin,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const projectId = Number(req.params.id);
-      const { wcGet } = await resolveWoo(projectId);
-      const page    = req.query.page     ?? "1";
-      const perPage = req.query.per_page ?? "20";
-      const search  = req.query.search   ?? "";
-
-      let path = `/customers?page=${page}&per_page=${perPage}&orderby=registered_date&order=desc`;
-      if (search) path += `&search=${encodeURIComponent(String(search))}`;
-
-      const customers = await wcGet<any[]>(path);
-
-      res.json({
-        customers: customers.map((c: any) => ({
-          id:            c.id,
-          name:          `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || c.username || "—",
-          email:         c.email,
-          username:      c.username,
-          role:          c.role,
-          ordersCount:   c.orders_count ?? 0,
-          totalSpent:    fmtMoney(c.total_spent),
-          dateCreated:   c.date_created,
-          dateModified:  c.date_modified,
-          avatarUrl:     c.avatar_url ?? null,
-          city:          c.billing?.city ?? "",
-          country:       c.billing?.country ?? "",
-        })),
-      });
-    } catch (err: any) {
-      logger.error("WOO customers error", err);
-      res.status(err.status ?? 500).json({ error: err.message });
-    }
-  }
-);
-
-// ── GET /admin/woo/project/:id/coupons ──────────────────────────────────────
-router.get(
-  "/admin/woo/project/:id/coupons",
-  requireAdmin,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const projectId = Number(req.params.id);
-      const { wcGet } = await resolveWoo(projectId);
-
-      const coupons = await wcGet<any[]>("/coupons?per_page=50&orderby=date&order=desc");
-
-      res.json({
-        coupons: coupons.map((c: any) => ({
-          id:             c.id,
-          code:           c.code,
-          discountType:   c.discount_type,
-          amount:         fmtMoney(c.amount),
-          description:    c.description ?? "",
-          dateExpiry:     c.date_expires ?? null,
-          usageCount:     c.usage_count ?? 0,
-          usageLimit:     c.usage_limit ?? null,
-          usageLimitUser: c.usage_limit_per_user ?? null,
-          freeShipping:   c.free_shipping ?? false,
-          minimumAmount:  c.minimum_amount ? fmtMoney(c.minimum_amount) : null,
-          maximumAmount:  c.maximum_amount ? fmtMoney(c.maximum_amount) : null,
-          individualUse:  c.individual_use ?? false,
-          emailRestrictions: c.email_restrictions ?? [],
-          productIds:     c.product_ids ?? [],
-          excludedProductIds: c.excluded_product_ids ?? [],
-          dateCreated:    c.date_created,
-        })),
-      });
-    } catch (err: any) {
-      logger.error("WOO coupons error", err);
-      res.status(err.status ?? 500).json({ error: err.message });
-    }
-  }
-);
-
-// ── GET /admin/woo/project/:id/inventory ────────────────────────────────────
-router.get(
-  "/admin/woo/project/:id/inventory",
-  requireAdmin,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const projectId = Number(req.params.id);
-      const { wcGet } = await resolveWoo(projectId);
-
-      // Traer productos con stock gestionado
-      const [lowStock, outOfStock, highStock] = await Promise.all([
-        wcGet<any[]>("/products?per_page=50&manage_stock=true&stock_status=instock"),
-        wcGet<any[]>("/products?per_page=50&stock_status=outofstock"),
-        wcGet<any[]>("/products?per_page=50&manage_stock=true&orderby=date&order=desc"),
-      ]);
-
-      // Filtrar los que tienen stock bajo (< 5)
-      const lowStockFiltered = (lowStock as any[]).filter(p =>
-        p.stock_quantity != null && p.stock_quantity < 5
-      );
-
-      res.json({
-        outOfStock: (outOfStock as any[]).map(p => ({
-          id: p.id, name: p.name, sku: p.sku,
-          stockStatus: p.stock_status,
-          stockQuantity: p.stock_quantity,
-          price: fmtMoney(p.price),
-        })),
-        lowStock: lowStockFiltered.map(p => ({
-          id: p.id, name: p.name, sku: p.sku,
-          stockQuantity: p.stock_quantity,
-          price: fmtMoney(p.price),
-        })),
-        totalTracked: (highStock as any[]).filter(p => p.manage_stock).length,
-        outOfStockCount: (outOfStock as any[]).length,
-        lowStockCount:   lowStockFiltered.length,
-      });
-    } catch (err: any) {
-      logger.error("WOO inventory error", err);
-      res.status(err.status ?? 500).json({ error: err.message });
-    }
-  }
-);
-
-// ── PUT /admin/woo/project/:id/products/:pid ────────────────────────────────
-router.put(
-  "/admin/woo/project/:id/products/:pid",
-  requireAdmin,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const projectId = Number(req.params.id);
-      const productId = Number(req.params.pid);
-      const { wcPut } = await resolveWoo(projectId);
-      const updated = await wcPut<any>(`/products/${productId}`, req.body);
-      res.json({ success: true, product: { id: updated.id, name: updated.name, status: updated.status } });
-    } catch (err: any) {
-      logger.error("WOO product update error", err);
-      res.status(err.status ?? 500).json({ error: err.message });
-    }
-  }
-);
-
-// ── GET /admin/woo/project/:id/reports/sales ────────────────────────────────
-router.get(
-  "/admin/woo/project/:id/reports/sales",
-  requireAdmin,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const projectId = Number(req.params.id);
-      const { wcGet } = await resolveWoo(projectId);
-      const period = (req.query.period as string) ?? "month";
-      const [salesReport, ordersTotals] = await Promise.all([
-        wcGet<any>(`/reports/sales?period=${period}`),
-        wcGet<any[]>("/reports/orders/totals"),
-      ]);
-      res.json({ sales: salesReport, orderTotals: ordersTotals });
-    } catch (err: any) {
-      logger.error("WOO reports error", err);
-      res.status(err.status ?? 500).json({ error: err.message });
-    }
-  }
-);
-
+  res.json(await wc.page(pathFor(req),query));
+}));
+router.get(`${base}/resources/:resource/:entityId`,handler(async(req,res,wc)=>{
+  res.json({result:await wc.request("GET",`${pathFor(req)}/${wooId(req.params.entityId)}`)});
+}));
+router.get(`${base}/schema/:resource`,handler(async(req,res,wc)=>{
+  const path=pathFor(req)+(req.query.entityId ? `/${wooId(req.query.entityId)}` : "");
+  const schema=await wc.request("OPTIONS",path);
+  const args=await wooSchema(wc,path,req.query.entityId ? "PUT" : "POST");
+  res.json({fields:Object.fromEntries(Object.entries(args).filter(([k])=>wooEditableFields[resource(req)].includes(k))),methods:schema.methods ?? []});
+}));
+router.post(`${base}/resources/:resource`,handler(async(req,res,wc)=>{
+  const parsed=CreateWooResourceBody.safeParse(req.body);
+  if (!parsed.success) throw new WooError("Datos de creación inválidos",400);
+  req.body=parsed.data;
+  const r=resource(req);
+  if (["orders","customers"].includes(r)) throw new WooError("La creación de pedidos o cuentas se realiza en WooCommerce",403);
+  if (req.body.confirmed !== true) throw new WooError("Confirma la creación",400);
+  res.status(201).json(await verifiedWooWrite(wc,r,pathFor(req),"POST",req.body.data,req.body.operationId));
+}));
+router.put(`${base}/resources/:resource/:entityId`,handler(async(req,res,wc)=>{
+  const parsed=UpdateWooResourceBody.safeParse(req.body);
+  if (!parsed.success) throw new WooError("Datos de actualización inválidos",400);
+  req.body=parsed.data;
+  if (req.body.confirmed!==true) throw new WooError("Confirma los cambios comerciales",400);
+  res.json(await verifiedWooWrite(wc,resource(req),`${pathFor(req)}/${wooId(req.params.entityId)}`,"PUT",req.body.data,req.body.operationId));
+}));
+router.post(`${base}/uploads`,handler(async(req,res,wc)=>{
+  const parsed=RequestWooUploadBody.safeParse(req.body);
+  if (!parsed.success) throw new WooError("Metadatos de subida inválidos",400);
+  req.body=parsed.data;
+  res.status(201).json(await wooUpload(wc.project.id,req.body.name,req.body.size,req.body.contentType));
+}));
+router.post(`${base}/imports/preview`,handler(async(req,res,wc)=>{
+  const parsed=PreviewWooFilesBody.safeParse(req.body);
+  if (!parsed.success) throw new WooError("Identificador de subida inválido",400);
+  req.body=parsed.data;
+  res.status(201).json(await wooImportPreviews(wc.project.id,await previewWooImport(wc.project.id,req.body.uploadId)));
+}));
+router.get(`${base}/imports/:importId`,handler(async(req,res,wc)=>{
+  if (!/^[a-f0-9-]{36}$/.test(String(req.params.importId))) throw new WooError("Importación inválida",400);
+  res.json(await wooImportPreviews(wc.project.id,await getWooJson(wc.project.id,`imports/${req.params.importId}.json`)));
+}));
+router.post(`${base}/imports/:importId/apply`,handler(async(req,res,wc)=>{
+  const parsed=ApplyWooFilesBody.safeParse(req.body);
+  if (!parsed.success) throw new WooError("Asignaciones o confirmación inválidas",400);
+  req.body=parsed.data;
+  if (req.body.confirmed!==true || req.body.publicFilesConfirmed!==true) throw new WooError("Confirma las asignaciones y la publicación de los archivos",400);
+  const allowed = (process.env.REPLIT_DOMAINS ?? "").split(",").map(v=>v.trim()).filter(Boolean);
+  const host=allowed.find(v=>v===req.get("host")) ?? allowed[0];
+  const permanentBase=process.env.REPLIT_DEPLOYMENT==="1" && host && /^[a-zA-Z0-9.-]+$/.test(host) ? `https://${host}` : "";
+  if(req.body.assignments.some((a:any)=>a.kind==="download") && !permanentBase) throw new WooError("Los descargables necesitan el dominio publicado permanente; no se guardan URLs de desarrollo",422);
+  res.json(await applyWooImport(wc,String(req.params.importId),req.body.assignments,permanentBase));
+}));
 export default router;

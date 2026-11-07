@@ -70,6 +70,26 @@ export const SERVICES: ServicePillar[] = [
     cta: "eCommerce con IA",
     accent: "#a78bfa",
   },
+  {
+    id: "agentes",
+    icon: "🤖",
+    title: "Asistentes y agentes conversacionales",
+    text: "Asistentes para WhatsApp y teléfono, chatbots para tu web y agentes a medida con las skills que necesita cada tarea.",
+    items: ["WhatsApp y teléfono", "Chatbot para landing", "Agentes con skills", "Solo diseño o configuración", "App personalizada opcional"],
+    href: "/tienda#catalogo",
+    cta: "Ver agentes y Ads",
+    accent: "var(--l-jade)",
+  },
+  {
+    id: "google-campanas",
+    icon: "📍",
+    title: "Presencia en Google y campañas",
+    text: "Ficha de empresa, reseñas y campañas de Google Ads, desde la puesta en marcha hasta la gestión continua.",
+    items: ["Perfil de Empresa de Google", "Reseñas y reservas", "Configuración de campañas", "Gestión periódica", "Presupuesto por alcance"],
+    href: "/tienda#catalogo",
+    cta: "Ver servicios y opciones",
+    accent: "var(--l-sky)",
+  },
 ];
 
 export interface PlatformCard {

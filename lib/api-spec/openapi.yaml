@@ -28,6 +28,166 @@ tags:
   - name: seo
     description: Technical SEO automation
 paths:
+  /admin/woo/project/{id}/overview:
+    get:
+      operationId: getWooOverview
+      parameters: [{$ref: '#/components/parameters/WooProjectId'}]
+      responses:
+        '200':
+          description: Complete live read model with origin, period, UTC, currency and definition
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /admin/woo/project/{id}/inventory:
+    get:
+      operationId: getWooInventory
+      parameters: [{$ref: '#/components/parameters/WooProjectId'}]
+      responses:
+        '200':
+          description: Inventory including variations, excluding duplicate parents
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /admin/woo/project/{id}/resources/{resource}:
+    parameters:
+      - {$ref: '#/components/parameters/WooProjectId'}
+      - {$ref: '#/components/parameters/WooResourceName'}
+    get:
+      operationId: listWooResources
+      parameters:
+        - {name: parentId, in: query, schema: {type: integer, minimum: 1}}
+        - {name: page, in: query, schema: {type: integer, minimum: 1}}
+        - {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 100}}
+        - {name: search, in: query, schema: {type: string, maxLength: 200}}
+        - {name: status, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: Native resources with total, totalPages, page, hasMore, fetchedAt and source
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+    post:
+      operationId: createWooResource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WooMutation'}
+      responses:
+        '201':
+          description: Read-back verified result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /admin/woo/project/{id}/resources/{resource}/{entityId}:
+    parameters:
+      - {$ref: '#/components/parameters/WooProjectId'}
+      - {$ref: '#/components/parameters/WooResourceName'}
+      - {name: entityId, in: path, required: true, schema: {type: integer, minimum: 1}}
+      - {name: parentId, in: query, schema: {type: integer, minimum: 1}}
+    get:
+      operationId: getWooResource
+      responses:
+        '200':
+          description: Native current resource in result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+    put:
+      operationId: updateWooResource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WooMutation'}
+      responses:
+        '200':
+          description: Read-back verified result
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /admin/woo/project/{id}/schema/{resource}:
+    get:
+      operationId: getWooSchema
+      parameters:
+        - {$ref: '#/components/parameters/WooProjectId'}
+        - {$ref: '#/components/parameters/WooResourceName'}
+        - {name: parentId, in: query, schema: {type: integer, minimum: 1}}
+        - {name: entityId, in: query, schema: {type: integer, minimum: 1}}
+      responses:
+        '200':
+          description: Installation OPTIONS schema, not proof of effective write permissions
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /admin/woo/project/{id}/uploads:
+    post:
+      operationId: requestWooUpload
+      parameters: [{$ref: '#/components/parameters/WooProjectId'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WooUploadInput'}
+      responses:
+        '201':
+          description: Direct App Storage PUT URL and identifier
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /admin/woo/project/{id}/imports/preview:
+    post:
+      operationId: previewWooFiles
+      parameters: [{$ref: '#/components/parameters/WooProjectId'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WooPreviewInput'}
+      responses:
+        '201':
+          description: Validated persistent preview
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /admin/woo/project/{id}/imports/{importId}:
+    get:
+      operationId: getWooImport
+      parameters:
+        - {$ref: '#/components/parameters/WooProjectId'}
+        - {$ref: '#/components/parameters/WooImportId'}
+      responses:
+        '200':
+          description: Persistent progress and partial results
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /admin/woo/project/{id}/imports/{importId}/apply:
+    post:
+      operationId: applyWooFiles
+      parameters:
+        - {$ref: '#/components/parameters/WooProjectId'}
+        - {$ref: '#/components/parameters/WooImportId'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WooImportInput'}
+      responses:
+        '200':
+          description: Verified rows and uncertain rows that cannot be replayed blindly
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WooObject'}
+  /woo-media/{projectId}/{token}:
+    get:
+      operationId: getPublishedWooFile
+      parameters:
+        - {name: projectId, in: path, required: true, schema: {type: integer, minimum: 1}}
+        - {name: token, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Explicitly published permanent image or download}
+        '404': {description: Nonexistent or unpublished file}
   /healthz:
     get:
       operationId: healthCheck
@@ -1041,6 +1201,21 @@ paths:
 
 components:
   parameters:
+    WooProjectId:
+      name: id
+      in: path
+      required: true
+      schema: {type: integer, minimum: 1}
+    WooResourceName:
+      name: resource
+      in: path
+      required: true
+      schema: {type: string, enum: [products, variations, categories, attributes, terms, orders, customers, coupons]}
+    WooImportId:
+      name: importId
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
     projectId:
       name: projectId
       in: path
@@ -1061,6 +1236,45 @@ components:
         type: string
 
   schemas:
+    WooObject:
+      type: object
+      additionalProperties: true
+    WooMutation:
+      type: object
+      required: [data, operationId, confirmed]
+      properties:
+        data: {$ref: '#/components/schemas/WooObject'}
+        operationId: {type: string, format: uuid}
+        confirmed: {type: boolean, enum: [true]}
+        parentId: {type: integer, minimum: 1}
+    WooUploadInput:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 200}
+        size: {type: integer, minimum: 1, maximum: 20971520}
+        contentType: {type: string, maxLength: 100}
+    WooPreviewInput:
+      type: object
+      required: [uploadId]
+      properties:
+        uploadId: {type: string, format: uuid}
+    WooAssignment:
+      type: object
+      required: [name, productId, kind]
+      properties:
+        name: {type: string}
+        productId: {type: integer, minimum: 1}
+        variationId: {type: integer, minimum: 1}
+        sku: {type: string}
+        kind: {type: string, enum: [image, download]}
+    WooImportInput:
+      type: object
+      required: [confirmed, publicFilesConfirmed, assignments]
+      properties:
+        confirmed: {type: boolean, enum: [true]}
+        publicFilesConfirmed: {type: boolean, enum: [true]}
+        assignments: {type: array, minItems: 1, maxItems: 100, items: {$ref: '#/components/schemas/WooAssignment'}}
     HealthStatus:
       type: object
       properties:

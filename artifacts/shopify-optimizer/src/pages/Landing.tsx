@@ -9,6 +9,7 @@ import SiteLinks from "@/components/SiteLinks";
 import { metaFor } from "@/components/PageMeta";
 import { HERO, SERVICES, PLATFORMS, PROCESS, PORTAL_FEATURES } from "@/lib/landing-content";
 import "./landing-2026.css";
+import { sendContactRequest } from "@/lib/contact-request";
 
 function SectionVideoBg({ src }: { src: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -68,7 +69,7 @@ function MagnetInstagramButton() {
       const dist = Math.hypot(dx, dy);
       if (dist < RADIUS) {
         const pull = (1 - dist / RADIUS) * STRENGTH * 60;
-        targetRef.current = { x: (dx / dist) * pull, y: (dy / dist) * pull };
+        targetRef.current = { x: (dx / (dist || 1)) * pull, y: (dy / (dist || 1)) * pull };
         setHovered(true);
       } else {
         targetRef.current = { x: 0, y: 0 };
@@ -229,7 +230,26 @@ export default function Landing() {
   const [formProgress, setFormProgress] = useState(0);
   const contactSectionRef = useRef<HTMLElement>(null);
   const heroSectionRef = useRef<HTMLElement>(null);
+  const cursorGlowRef = useRef<HTMLDivElement>(null);
   const [heroTilt, setHeroTilt] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const el = cursorGlowRef.current;
+    if (!el || window.matchMedia("(hover: none), (pointer: coarse), (prefers-reduced-motion: reduce)").matches) return;
+    const move = (e: MouseEvent) => {
+      el.style.setProperty("--cursor-x", `${e.clientX}px`);
+      el.style.setProperty("--cursor-y", `${e.clientY}px`);
+      el.classList.add("is-visible");
+    };
+    const leave = () => el.classList.remove("is-visible");
+    window.addEventListener("mousemove", move, { passive: true });
+    document.addEventListener("mouseleave", leave);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseleave", leave);
+      el.classList.remove("is-visible");
+    };
+  }, []);
 
   // Las etiquetas del CMS iban por índice de las secciones antiguas: con la nueva
   // estructura se usan las propias.
@@ -269,23 +289,20 @@ export default function Landing() {
     setContactStatus("sending");
     setContactError("");
     try {
-      let res: Response;
       if (refImageFile) {
         const fd = new FormData();
         Object.entries(contactForm).forEach(([k, v]) => fd.append(k, v));
         fd.append("services", JSON.stringify(contactServices));
         fd.append("referenceImage", refImageFile);
-        res = await fetch(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd });
+        await sendContactRequest(`${BASE_URL}/api/contact`, { method: "POST", credentials: "include", body: fd }, "public-contact");
       } else {
-        res = await fetch(`${BASE_URL}/api/contact`, {
+        await sendContactRequest(`${BASE_URL}/api/contact`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...contactForm, services: contactServices }),
-        });
+        }, "public-contact");
       }
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? (content?.errorMessages?.sendFail ?? "Error al enviar"));
       setContactStatus("sent");
     } catch (err: unknown) {
       setContactStatus("error");
@@ -547,19 +564,7 @@ export default function Landing() {
   return (
     <div className={`l-root${isPreview ? " cms-preview-mode" : ""}`}>
       {/* ── CURSOR GLOW SPOTLIGHT ── */}
-      <div
-        className="fp-cursor-glow"
-        ref={(el) => {
-          if (!el) return;
-          const move = (e: MouseEvent) => {
-            el.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%))`;
-          };
-          // React llama a este ref en cada render: sin esto se acumulan listeners.
-          (el as any).__cleanup?.();
-          window.addEventListener("mousemove", move, { passive: true });
-          (el as any).__cleanup = () => window.removeEventListener("mousemove", move);
-        }}
-      />
+      <div className="fp-cursor-glow" ref={cursorGlowRef} aria-hidden="true" />
       <PageMeta {...metaFor("/")} />
       {/* ── FIXED NAV ── */}
       <nav className="l-nav l-nav-fp">

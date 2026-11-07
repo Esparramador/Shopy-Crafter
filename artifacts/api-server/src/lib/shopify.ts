@@ -22,6 +22,34 @@ export class ShopifyAuthError extends Error {
   }
 }
 
+/**
+ * Resume una respuesta de error de Shopify: si es una página HTML (tienda cerrada, en pausa o
+ * inexistente) devuelve una frase corta en vez de la página entera.
+ */
+export function resumenRespuestaShopify(texto: string): string {
+  const t = String(texto || "");
+  if (/<html|<!doctype/i.test(t)) {
+    if (/shop-404|store unavailable|there(?:'|’)s no store|this store is unavailable|tienda no disponible/i.test(t)) return "store unavailable";
+    const titulo = (t.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1];
+    if (titulo && /password|opening soon|coming soon/i.test(titulo)) return "store password protected";
+    return titulo ? titulo.trim().slice(0, 120) : "Shopify devolvió una página HTML";
+  }
+  return t.replace(/\s+/g, " ").trim().slice(0, 300);
+}
+
+/** Mensaje claro para la persona a partir de un error de Shopify (nunca HTML ni textos larguísimos). */
+export function mensajeShopifyUsuario(err: unknown, shopDomain?: string | null): string {
+  const m = err instanceof Error ? err.message : String(err ?? "");
+  const tienda = shopDomain ? normalizeShopDomain(String(shopDomain)) : "la tienda";
+  if (/app_not_installed/i.test(m)) return "La app de Shopify está desinstalada en " + tienda + ". Reinstálala desde el panel de Shopify y vuelve a conectar la tienda.";
+  if (/store unavailable|Token generation failed \(404\)|\(404\)/i.test(m)) return `La tienda ${tienda} no está disponible en Shopify (no existe, está cerrada o en pausa). Revisa el dominio .myshopify.com en Configuración o reactiva la tienda en Shopify.`;
+  if (/password protected/i.test(m)) return `La tienda ${tienda} tiene la contraseña de tienda cerrada activada: Shopify no deja conectar hasta que se abra.`;
+  if (/invalid_client|\((401|403)\)|unauthorized|forbidden/i.test(m)) return `Shopify ha rechazado las credenciales de la app para ${tienda} (Client ID o Client Secret). Revísalas en Configuración o renueva el token.`;
+  if (err instanceof ShopifyAuthError) return `La conexión con ${tienda} ha caducado. Pulsa «Renovar token» o vuelve a conectar la tienda en Configuración.`;
+  if (/timeout|aborted|ETIMEDOUT|ECONNRESET|fetch failed/i.test(m)) return `Shopify no ha respondido a tiempo (${tienda}). Vuelve a intentarlo en un momento.`;
+  return "Error al conectar con Shopify: " + resumenRespuestaShopify(m);
+}
+
 export function normalizeShopDomain(domain: string): string {
   return domain.replace("https://", "").replace("http://", "").replace(/\/$/, "");
 }
@@ -56,7 +84,7 @@ export async function refreshToken(
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new ShopifyAuthError(`Token generation failed (${resp.status}): ${text}`);
+    throw new ShopifyAuthError(`Token generation failed (${resp.status}): ${resumenRespuestaShopify(text)}`);
   }
 
   const data = (await resp.json()) as { access_token: string; expires_in?: number };
@@ -121,12 +149,12 @@ async function shopifyRetry<T>(fn: () => Promise<Response>, path: string, projec
     }
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
+      throw new Error(`Shopify API error ${resp.status} at ${path}: ${resumenRespuestaShopify(text)}`);
     }
     return resp.json() as Promise<T>;
   }
   const text = lastResp ? await lastResp.text() : "Max retries exceeded";
-  throw new Error(`Shopify API error after retries at ${path}: ${text}`);
+  throw new Error(`Shopify API error after retries at ${path}: ${resumenRespuestaShopify(text)}`);
 }
 
 /**
@@ -217,7 +245,7 @@ export async function shopifyRequestPaged<T>(
 
       if (!resp.ok) {
         const text = await resp.text();
-        throw new Error(`Shopify API error ${resp.status} at ${path}: ${text}`);
+        throw new Error(`Shopify API error ${resp.status} at ${path}: ${resumenRespuestaShopify(text)}`);
       }
 
       const linkHeader = resp.headers.get("Link") ?? "";
@@ -229,7 +257,7 @@ export async function shopifyRequestPaged<T>(
       return { data, nextPageInfo };
     }
     const text = lastResp ? await lastResp.text() : "Max retries exceeded";
-    throw new Error(`Shopify API error after retries at ${path}: ${text}`);
+    throw new Error(`Shopify API error after retries at ${path}: ${resumenRespuestaShopify(text)}`);
   };
 
   return doPagedFetch(hdrs);
@@ -264,7 +292,7 @@ export async function rotateToken(
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`Token rotation failed (${resp.status}): ${text}`);
+    throw new Error(`Token rotation failed (${resp.status}): ${resumenRespuestaShopify(text)}`);
   }
 
   const data = (await resp.json()) as { access_token: string; expires_in?: number };
@@ -318,7 +346,7 @@ export async function shopifyGraphQL<T = Record<string, unknown>>(
 
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`Shopify GraphQL error ${resp.status}: ${text}`);
+      throw new Error(`Shopify GraphQL error ${resp.status}: ${resumenRespuestaShopify(text)}`);
     }
 
     const result = await resp.json() as { data?: T; errors?: Array<{ message: string }> };

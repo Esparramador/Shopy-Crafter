@@ -3,9 +3,11 @@ import { Link } from "wouter";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Flip } from "gsap/Flip";
+import { Bot, Megaphone, MessageCircle, Smartphone } from "lucide-react";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import ShopLayout from "./ShopLayout";
 import { assetUrl, coverOf, euros, fromPrice, loadCatalog, priceLabel, serviceMark, type Catalog, type Product } from "./shop-api";
+import { AI_SERVICES_CATEGORY, SHOP_SERVICE_OFFERS, shopServiceContactHref, type ShopServiceOffer } from "./shop-services";
 import { bindMagnetic, bindTilt, prefersReduced } from "./shop-motion";
 
 gsap.registerPlugin(ScrollTrigger, Flip);
@@ -57,6 +59,40 @@ function ProductCard({ p }: { p: Product }) {
         </div>
       </div>
     </Link>
+  );
+}
+
+const OFFER_ICONS = {
+  assistant: MessageCircle,
+  chatbot: Bot,
+  custom: Smartphone,
+  ads: Megaphone,
+} as const;
+
+function ShopServiceCard({ offer }: { offer: ShopServiceOffer }) {
+  const Icon = OFFER_ICONS[offer.icon];
+  return (
+    <article className="shop-ai-card">
+      <div className="shop-ai-card-icon" aria-hidden="true"><Icon size={21} strokeWidth={1.8} /></div>
+      <span className="shop-card-cat">{offer.group === "ads" ? "Google Ads" : "Agentes de IA"}</span>
+      <h4>{offer.name}</h4>
+      <p>{offer.description}</p>
+      <ul className="shop-ai-variants">
+        {offer.variants.map(variant => (
+          <li key={variant.label}>
+            <div><strong>{variant.label}</strong><span>{variant.detail}</span></div>
+            <Link className="shop-ai-quote" href={shopServiceContactHref(variant.subject)}>
+              Pedir presupuesto <span aria-hidden="true">→</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <small className="shop-ai-note">
+        {offer.group === "ads"
+          ? "Presupuesto por escrito antes de empezar. La inversión publicitaria va aparte."
+          : "Presupuesto por escrito antes de empezar; la puesta en marcha se acuerda aparte."}
+      </small>
+    </article>
   );
 }
 
@@ -176,12 +212,15 @@ export default function Shop() {
     ScrollTrigger.refresh();
   }, [cat]);
 
-  const categories = useMemo(() => {
-    if (!data) return [];
-    const used = new Set(data.products.map(p => p.category));
-    return Object.entries(data.categories).filter(([k]) => used.has(k));
+  const categories = useMemo((): Array<[string, string]> => {
+    const used = new Set((data?.products ?? []).map(p => p.category));
+    const catalogCategories = Object.entries(data?.categories ?? {}).filter(([k]) => used.has(k));
+    return [...catalogCategories, [AI_SERVICES_CATEGORY, "Agentes y Ads"]];
   }, [data]);
-  const products = useMemo(() => (data?.products ?? []).filter(p => cat === "todo" || p.category === cat), [data, cat]);
+  const products = useMemo(() => (data?.products ?? []).filter(p => cat === "todo" || (cat !== AI_SERVICES_CATEGORY && p.category === cat)), [data, cat]);
+  const showAiServices = cat === "todo" || cat === AI_SERVICES_CATEGORY;
+  const agentOffers = SHOP_SERVICE_OFFERS.filter(offer => offer.group === "agents");
+  const adOffers = SHOP_SERVICE_OFFERS.filter(offer => offer.group === "ads");
   const isGift = (p: Product) => ["tarjetas-regalo", "fotos-grabadas", "regalos-3d"].includes(p.category);
   const gifts = products.filter(isGift);
   const physical = products.filter(p => p.kind === "physical" && !isGift(p));
@@ -320,6 +359,16 @@ export default function Shop() {
               <h3 className="shop-group-title">Google, reseñas y reservas</h3>
               <p className="shop-group-intro">Tu ficha de Google Maps, tus reseñas y tus reservas con Google Calendar, gestionadas con nuestro panel Crafter Mando. Precios «a partir de»: el importe final se cierra por escrito según el trabajo.</p>
               <div className="shop-grid">{googleServices.map(p => <ProductCard key={p.slug} p={p} />)}</div>
+            </>
+          )}
+          {showAiServices && (
+            <>
+              <h3 className="shop-group-title">Agentes conversacionales y a medida</h3>
+              <p className="shop-group-intro">Elige si necesitas solo el diseño o también la integración y configuración. Cada puesta en marcha requiere trabajo y se presupuesta según tu caso. El Perfil de Empresa de Google y la gestión de reseñas están en «Google, reseñas y reservas».</p>
+              <div className="shop-ai-grid">{agentOffers.map(offer => <ShopServiceCard key={offer.name} offer={offer} />)}</div>
+              <h3 className="shop-group-title">Publicidad y captación</h3>
+              <p className="shop-group-intro">Configuración inicial o gestión continua de campañas. El presupuesto publicitario se define aparte del servicio.</p>
+              <div className="shop-ai-grid shop-ai-grid-ads">{adOffers.map(offer => <ShopServiceCard key={offer.name} offer={offer} />)}</div>
             </>
           )}
           {otherDigital.length > 0 && (

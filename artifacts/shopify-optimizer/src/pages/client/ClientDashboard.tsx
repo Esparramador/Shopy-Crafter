@@ -148,6 +148,9 @@ export default function ClientDashboard() {
 
   // ── PLATFORM ROUTING ─────────────────────────────────────────────────────────
   const platformType = data?.platformType ?? null;
+  if (!loading && !data) {
+    return <ClientLayout><p role="alert">No se pudo cargar el proyecto. No se han confirmado cifras de la tienda. Vuelve a cargar el panel para reintentar.</p></ClientLayout>;
+  }
   if (!loading && platformType === "woocommerce") {
     return (
       <ClientLayout>

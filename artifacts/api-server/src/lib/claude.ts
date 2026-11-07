@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { db } from "@workspace/db";
 import { projectsTable, omnicoreMemoriesTable, omnicorePromptLibraryTable, omnicoreInsightsTable, visualDnaTable, omnicoreAbsorbedContentTable, omnicoreCrossConnectionsTable } from "@workspace/db";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
@@ -1053,6 +1053,7 @@ export function learnFromOperation(params: {
   structuredData?: Record<string, unknown>;
   sourceProjectId?: number;
   relatedProductId?: string;
+  idempotencyKey?: string;
   monetaryValues?: { revenue?: number; cost?: number; margin?: number; price?: number };
   metrics?: Record<string, number>;
 }): void {
@@ -1196,7 +1197,9 @@ export function learnFromOperation(params: {
   const allTags = [...new Set([...(params.tags ?? []), params.operationType, params.niche ?? "", params.productType ?? ""].filter(Boolean))];
 
   db.insert(omnicoreMemoriesTable).values({
-    id: randomBytes(16).toString("hex"),
+    id: params.idempotencyKey
+      ? createHash("sha256").update(params.idempotencyKey).digest("hex")
+      : randomBytes(16).toString("hex"),
     memoryType,
     niche: params.niche ?? null,
     productType: params.productType ?? null,
@@ -1210,7 +1213,7 @@ export function learnFromOperation(params: {
     useCount: 1,
     successCount: 1,
     successRate: 1.0,
-  }).catch(() => {});
+  }).onConflictDoNothing().catch(() => {});
 
   if (params.monetaryValues && Object.keys(params.monetaryValues).length > 0) {
     // La tabla no se creaba en ningún sitio: cada INSERT fallaba en silencio.

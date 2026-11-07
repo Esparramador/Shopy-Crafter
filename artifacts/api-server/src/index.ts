@@ -360,6 +360,15 @@ const server = app.listen(port, (err?: Error) => {
 
   // Inject DB-stored API keys into process.env (non-blocking)
   injectDbApiKeys().catch(() => {}).then(() => {
+    import("./routes/contact.js")
+      .then((m) => m.startContactPrereportRecoveryWorker())
+      .catch((err) => {
+        logger.error(
+          { errorCode: err instanceof Error ? err.name : "UnknownError" },
+          "Contact pre-report worker could not start",
+        );
+      });
+
     // Solo en el despliegue: en local la URL pública no es la de producción.
     if (process.env.REPLIT_DEPLOYMENT !== "1") return;
     import("./lib/stripe-webhook-setup.js")

@@ -1,301 +1,457 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml">
-
-  <!-- ── Main pages ── -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://shopycrafter.com/</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="es" href="https://shopycrafter.com/" />
+    <priority>1.00</priority>
   </url>
-
   <url>
-    <loc>https://shopycrafter.com/sobre-nosotros</loc>
-    <lastmod>2026-07-03</lastmod>
+    <loc>https://shopycrafter.com/automatizacion-shopify-ia</loc>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.95</priority>
   </url>
-
   <url>
-    <loc>https://shopycrafter.com/programa-de-afiliados</loc>
-    <lastmod>2026-07-03</lastmod>
+    <loc>https://shopycrafter.com/automatizacion-woocommerce-ia</loc>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.95</priority>
   </url>
-
   <url>
-    <loc>https://shopycrafter.com/faq</loc>
-    <lastmod>2026-07-03</lastmod>
+    <loc>https://shopycrafter.com/automatizacion-prestashop-ia</loc>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.95</priority>
   </url>
-
   <url>
-    <loc>https://shopycrafter.com/preguntas-frecuentes</loc>
-    <lastmod>2026-07-03</lastmod>
+    <loc>https://shopycrafter.com/gestion-stripe-ia</loc>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.90</priority>
   </url>
-
   <url>
-    <loc>https://shopycrafter.com/contacto</loc>
-    <lastmod>2026-07-03</lastmod>
+    <loc>https://shopycrafter.com/diseno-web-profesional</loc>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.90</priority>
   </url>
-
-  <!-- ── Comparison / keyword landing pages (alta intención) ── -->
   <url>
-    <loc>https://shopycrafter.com/shopify-vs-woocommerce</loc>
-    <lastmod>2026-07-03</lastmod>
+    <loc>https://shopycrafter.com/desarrollo-apps-nativas</loc>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.90</priority>
   </url>
-
   <url>
-    <loc>https://shopycrafter.com/shopify-vs-prestashop</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://shopycrafter.com/migrar-woocommerce-shopify</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>monthly</changefreq>
+    <loc>https://shopycrafter.com/tienda</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
-
-  <url>
-    <loc>https://shopycrafter.com/migrar-prestashop-shopify</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.85</priority>
-  </url>
-
-  <url>
-    <loc>https://shopycrafter.com/shopify-stripe-pagos</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
   <url>
     <loc>https://shopycrafter.com/agencia-shopify-ia</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/ecommerce-ia-automatizacion</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
-
-  <!-- ── Legal ── -->
-  <url>
-    <loc>https://shopycrafter.com/privacidad</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-
-  <url>
-    <loc>https://shopycrafter.com/terminos</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-
-  <url>
-    <loc>https://shopycrafter.com/cookies</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.2</priority>
-  </url>
-
-  <!-- ── Blog archive ── -->
   <url>
     <loc>https://shopycrafter.com/blog</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.80</priority>
   </url>
-
-  <!-- Blog — Comparativas y migraciones (keywords de alta intención) -->
+  <url>
+    <loc>https://shopycrafter.com/shopify-vs-woocommerce</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/shopify-vs-prestashop</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/migrar-woocommerce-shopify</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/migrar-prestashop-shopify</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/shopify-stripe-pagos</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.80</priority>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/tarjetas-metalicas</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/3d-tarjetas-metalicas-poster.webp</image:loc><image:title>Tarjetas de visita de aluminio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/tarjeta-ceo-v5.webp</image:loc><image:title>Tarjetas de visita de aluminio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/taller-grabado-tarjeta-poster.webp</image:loc><image:title>Tarjetas de visita de aluminio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/tarjeta-shopycrafter-delante.webp</image:loc><image:title>Tarjetas de visita de aluminio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/tarjeta-shopycrafter-detras.webp</image:loc><image:title>Tarjetas de visita de aluminio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/tarjeta-lazy-lizard.webp</image:loc><image:title>Tarjetas de visita de aluminio</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/placa-qr-madera</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/3d-placa-qr-madera-poster.webp</image:loc><image:title>Placa QR de madera con soporte</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/placa-qr-hanakaze.webp</image:loc><image:title>Placa QR de madera con soporte</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/placa-resenas-madera.webp</image:loc><image:title>Placa QR de madera con soporte</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/pies-cartel-render.webp</image:loc><image:title>Placa QR de madera con soporte</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/kit-resenas</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/placa-qr-hanakaze.webp</image:loc><image:title>Kit Reseñas para tu negocio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/placa-resenas-madera.webp</image:loc><image:title>Kit Reseñas para tu negocio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/tarjeta-shopycrafter-detras.webp</image:loc><image:title>Kit Reseñas para tu negocio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/expositor-tarjetas-vertical.webp</image:loc><image:title>Kit Reseñas para tu negocio</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/tarjeta-foto-aluminio</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/3d-tarjeta-foto-aluminio-poster.webp</image:loc><image:title>Foto grabada en tarjeta de aluminio</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/regalo-web-3d</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/regalo-robot-poster.webp</image:loc><image:title>Regalo web 3D</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/regalo-demo-1.webp</image:loc><image:title>Regalo web 3D</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/landing-3d</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-landing-3d-poster.webp</image:loc><image:title>Landing con 3D y animación</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/portfolio/warriors-hardcore-1.webp</image:loc><image:title>Landing con 3D y animación</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/portfolio/warriors-hardcore-2.webp</image:loc><image:title>Landing con 3D y animación</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/portfolio/warriors-hardcore-3.webp</image:loc><image:title>Landing con 3D y animación</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/rediseno-tienda</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-rediseno-tienda-v2-poster.webp</image:loc><image:title>Rediseño de tienda online</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/video-3d-marca</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-video-3d-poster-16x9.webp</image:loc><image:title>Vídeo animado 3D de marca</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/ficha-google-maps</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/google-ficha-mando.webp</image:loc><image:title>Ficha de Google Maps optimizada</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-google-mando-poster.webp</image:loc><image:title>Ficha de Google Maps optimizada</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/resenas-google</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-google-mando-poster.webp</image:loc><image:title>Gestión de reseñas de Google</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/google-resenas-mando.webp</image:loc><image:title>Gestión de reseñas de Google</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/placa-resenas-madera.webp</image:loc><image:title>Gestión de reseñas de Google</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/pack-google-local</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.80</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/google-ficha-mando.webp</image:loc><image:title>Pack Presencia en Google</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/google-resenas-mando.webp</image:loc><image:title>Pack Presencia en Google</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/placa-resenas-madera.webp</image:loc><image:title>Pack Presencia en Google</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/faq</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/contacto</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.70</priority>
+  </url>
   <url>
     <loc>https://shopycrafter.com/blog/shopify-vs-woocommerce-2026</loc>
     <lastmod>2026-07-03</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.70</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/shopify-vs-prestashop-2026</loc>
     <lastmod>2026-07-03</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.9</priority>
+    <priority>0.70</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/migrar-woocommerce-shopify-ia</loc>
     <lastmod>2026-07-03</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.70</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/stripe-shopify-guia-pagos-2026</loc>
     <lastmod>2026-07-03</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.70</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/mejor-plataforma-ecommerce-2026</loc>
     <lastmod>2026-07-03</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.70</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/shopify-ia-automatizacion-2026</loc>
     <lastmod>2026-07-03</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.85</priority>
+    <priority>0.70</priority>
   </url>
-
-  <!-- Blog — Artículos existentes -->
   <url>
     <loc>https://shopycrafter.com/blog/optimizar-fichas-google-shopping-2026</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-04-28</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.70</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/claude-vs-gemini-ecommerce</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-04-15</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.70</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/guia-cogs-tiendas-online</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-03-30</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.70</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/ab-testing-automatizado-ia</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-03-12</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.70</priority>
   </url>
-
-  <url>
-    <loc>https://shopycrafter.com/blog/comic-crafter-caso-exito</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
   <url>
     <loc>https://shopycrafter.com/blog/17-motores-ia-ecommerce</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-02-10</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.70</priority>
   </url>
-
-  <!-- ── Casos de éxito ── -->
+  <url>
+    <loc>https://shopycrafter.com/tienda/expositor-tarjetas</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/placa-qr-hanakaze.webp</image:loc><image:title>Expositor de tarjetas con tu logo</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/pies-cartel-render.webp</image:loc><image:title>Expositor de tarjetas con tu logo</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/expositor-tarjetas-vertical.webp</image:loc><image:title>Expositor de tarjetas con tu logo</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/kit-expositor-tarjetas</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/tarjeta-shopycrafter-delante.webp</image:loc><image:title>Expositor + 100 tarjetas de aluminio</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/expositor-tarjetas-vertical.webp</image:loc><image:title>Expositor + 100 tarjetas de aluminio</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/foto-madera-peana</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/3d-foto-madera-peana-poster.webp</image:loc><image:title>Foto grabada en madera con peana</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/marco-madera-foto</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/3d-marco-madera-foto-poster.webp</image:loc><image:title>Marco de madera con foto grabada</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/panoramica-madera</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/3d-panoramica-madera-poster.webp</image:loc><image:title>Panorámica grabada en madera</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/regalo-completo</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/regalo-robot-poster.webp</image:loc><image:title>Regalo completo: tarjeta + web 3D</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/regalo-demo-1.webp</image:loc><image:title>Regalo completo: tarjeta + web 3D</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/qr-artistico</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/qr-artistico-shopycrafter.webp</image:loc><image:title>QR artístico de marca</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/portfolio/qr-artisticos-3d-1.webp</image:loc><image:title>QR artístico de marca</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/portfolio/qr-artisticos-3d-2.webp</image:loc><image:title>QR artístico de marca</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/portfolio/qr-artisticos-3d-3.webp</image:loc><image:title>QR artístico de marca</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/web-corporativa</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-web-corporativa-poster.webp</image:loc><image:title>Web corporativa</image:title></image:image>
+    <image:image><image:loc>https://shopycrafter.com/portfolio/brasas-y-paellas-1.webp</image:loc><image:title>Web corporativa</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/app-nativa</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-app-nativa.webp</image:loc><image:title>App nativa Android e iOS</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/auditoria-seo</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-auditoria-seo.webp</image:loc><image:title>Auditoría SEO y plan de acción</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/optimizacion-pagespeed</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-pagespeed.webp</image:loc><image:title>Optimización PageSpeed y Core Web Vitals</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/informes-mensuales</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-informes.webp</image:loc><image:title>Informes mensuales de web y tienda</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/tienda/google-calendar-reservas</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.70</priority>
+    <image:image><image:loc>https://shopycrafter.com/tienda-media/servicio-calendar.webp</image:loc><image:title>Reservas y agenda con Google Calendar</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/sobre-nosotros</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.60</priority>
+  </url>
   <url>
     <loc>https://shopycrafter.com/casos-de-exito</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <url>
-    <loc>https://shopycrafter.com/casos-de-exito/comic-crafter</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-11-05</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
+    <priority>0.60</priority>
   </url>
-
-  <url>
-    <loc>https://shopycrafter.com/casos-de-exito/sakura-studio</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://shopycrafter.com/casos-de-exito/audit-multipart</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <!-- ── Changelog ── -->
   <url>
     <loc>https://shopycrafter.com/changelog</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.40</priority>
   </url>
-
+  <url>
+    <loc>https://shopycrafter.com/programa-de-afiliados</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.40</priority>
+  </url>
   <url>
     <loc>https://shopycrafter.com/changelog/3.8.0</loc>
-    <lastmod>2026-07-03</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.5</priority>
+    <lastmod>2026-04-30</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/changelog/3.7.0</loc>
     <lastmod>2026-04-12</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/changelog/3.6.0</loc>
     <lastmod>2026-03-28</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/changelog/3.5.0</loc>
     <lastmod>2026-03-10</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/changelog/3.4.0</loc>
     <lastmod>2026-02-20</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/changelog/3.3.0</loc>
     <lastmod>2026-02-05</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
   </url>
-
   <url>
     <loc>https://shopycrafter.com/changelog/3.2.0</loc>
     <lastmod>2026-01-15</lastmod>
-    <changefreq>never</changefreq>
-    <priority>0.5</priority>
+    <changefreq>yearly</changefreq>
+    <priority>0.30</priority>
   </url>
-
+  <url>
+    <loc>https://shopycrafter.com/privacidad</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.20</priority>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/terminos</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.20</priority>
+  </url>
+  <url>
+    <loc>https://shopycrafter.com/cookies</loc>
+    <lastmod>2026-11-05</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.20</priority>
+  </url>
 </urlset>

@@ -646,8 +646,8 @@ export declare const insertAbTestSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodString>;
     projectId: z.ZodInt;
     shopifyProductId: z.ZodString;
-    imageType: z.ZodString;
     productTitle: z.ZodString;
+    imageType: z.ZodString;
     testType: z.ZodOptional<z.ZodString>;
     hypothesis: z.ZodString;
     variantAPrice: z.ZodOptional<z.ZodNullable<z.ZodString>>;

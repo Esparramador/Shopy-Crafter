@@ -99,12 +99,12 @@ export async function sendEmail(
     await gmail.users.messages.send({
       userId: "me",
       requestBody: { raw },
-    });
+    }, { timeout: 20_000 });
 
-    logger.info({ to, subject }, "Gmail: email sent successfully");
+    logger.info("Gmail: email sent successfully");
     return true;
   } catch (err) {
-    logger.error({ err, to, subject }, "Gmail: failed to send email");
+    logger.error({ errorCode: err instanceof Error ? err.name : "UnknownError" }, "Gmail: failed to send email");
     return false;
   }
 }
@@ -174,10 +174,10 @@ export async function sendEmailWithAttachment(
       .replace(/=+$/, "");
 
     await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
-    logger.info({ to, subject, attachments: attachments.map(a => a.filename) }, "Gmail: email with attachment sent");
+    logger.info("Gmail: email with attachment sent");
     return true;
   } catch (err) {
-    logger.error({ err, to, subject }, "Gmail: failed to send email with attachment");
+    logger.error({ errorCode: err instanceof Error ? err.name : "UnknownError" }, "Gmail: failed to send email with attachment");
     return false;
   }
 }

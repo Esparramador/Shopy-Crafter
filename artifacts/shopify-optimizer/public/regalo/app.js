@@ -15,6 +15,21 @@ const ES_MOVIL = matchMedia("(pointer: coarse)").matches;
 // Calidad 2 = ordenador, 1 = móvil, 0 = mínima. Si el móvil pierde el contexto WebGL, se recarga sola un escalón más abajo.
 const PARAM_Q = new URLSearchParams(location.search).get("q");
 const CALIDAD = PARAM_Q !== null && /^[0-2]$/.test(PARAM_Q) ? Number(PARAM_Q) : (ES_MOVIL ? 1 : 2);
+// Qué gráfica hay. Las PowerVR (Pixel 10) se reinician al leer un mapa de sombras: ahí y en cualquier móvil, sin sombras
+// de mapa (se usan sombras suaves pintadas). Si el navegador no da WebGL (o lo ha bloqueado tras un reinicio de la
+// gráfica), la página sigue en modo 2D: el regalo se abre igual y se ven las fotos y el mensaje.
+const GPU = (() => {
+  try {
+    const c = document.createElement("canvas"), gl = c.getContext("webgl2") || c.getContext("webgl");
+    if (!gl) return null;
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const nombre = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+    const perder = gl.getExtension("WEBGL_lose_context"); if (perder) perder.loseContext();
+    return nombre;
+  } catch (e) { return null; }
+})();
+const SIN3D = PARAM_Q === "x" || GPU === null;
+const SOMBRAS = !SIN3D && !ES_MOVIL && CALIDAD >= 1 && !/PowerVR|Imagination/i.test(GPU);
 
 // ------------------------------------------------------------------ DOM
 const $ = (id) => document.getElementById(id);
@@ -41,33 +56,41 @@ addEventListener("error", (e) => avisa("error: " + (e.message || e.error)));
 addEventListener("unhandledrejection", (e) => avisa("promesa: " + (e.reason && (e.reason.message || e.reason))));
 
 // ------------------------------------------------------------------ render
-let renderer;
-try {
-  renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: CALIDAD >= 2, powerPreference: CALIDAD >= 2 ? "high-performance" : "default" });
-} catch (e) { avisa("WebGL no disponible: " + e.message); throw e; }
+let renderer = null;
+if (!SIN3D) {
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: lienzo, antialias: CALIDAD >= 2, powerPreference: CALIDAD >= 2 ? "high-performance" : "default" });
+  } catch (e) { renderer = null; }
+}
+const MODO2D = !renderer;
+window.__regalo = { get renderer() { return renderer; }, GPU, SOMBRAS, CALIDAD };
+if (MODO2D) {                     // sin 3D: un renderizador que no pinta nada, para que el resto del código funcione igual
+  document.body.classList.add("modo2d");
+  renderer = { debug: {}, shadowMap: {}, setClearColor() {}, setPixelRatio() {}, setSize() {}, compile() {}, render() {},
+    setAnimationLoop(f) { const bucle = () => { f(); requestAnimationFrame(bucle); }; requestAnimationFrame(bucle); } };
+}
 renderer.debug.onShaderError = (gl, programa, vs, fs) => {
   avisa("shader: " + (gl.getProgramInfoLog(programa) || "") + " | " + (gl.getShaderInfoLog(vs) || "") + " | " + (gl.getShaderInfoLog(fs) || ""));
 };
 lienzo.addEventListener("webglcontextlost", (e) => {
   e.preventDefault();
-  if (CALIDAD > 0 && ui.recuerdos.classList.contains("oculto")) {
-    ui.estado.textContent = "Ajustando a tu móvil…";
-    location.replace(location.pathname + "?q=" + (CALIDAD - 1));
-  } else avisa("contexto WebGL perdido (calidad " + CALIDAD + ")");
+  if (!ui.recuerdos.classList.contains("oculto")) return;        // ya están las fotos (2D): no hace falta el 3D
+  ui.estado.textContent = "Ajustando a tu móvil…";
+  location.replace(location.pathname + "?q=" + (CALIDAD > 0 ? CALIDAD - 1 : "x"));
 });
 renderer.setClearColor(0xefc29a, 1);            // si el cielo no se pinta, se ve la bruma dorada, nunca blanco ni negro
 renderer.setPixelRatio(Math.min(devicePixelRatio, [1, 1.25, 2][CALIDAD]));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.08;
-renderer.shadowMap.enabled = CALIDAD >= 1;
+renderer.shadowMap.enabled = SOMBRAS;
 renderer.shadowMap.type = CALIDAD >= 2 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 
 const escena = new THREE.Scene();
 const camara = new THREE.PerspectiveCamera(38, 1, 0.1, 220);
 
 // escenario: jardín al atardecer (cielo, colinas, césped, árboles, guirnalda, globos, luciérnagas)
-const ambiente = crearEscenario(escena, { movil: ES_MOVIL, calidad: CALIDAD, posCaja: new THREE.Vector3(0.9, 0, 0.7) });
+const ambiente = crearEscenario(escena, { movil: ES_MOVIL, calidad: CALIDAD, sombras: SOMBRAS, posCaja: new THREE.Vector3(0.9, 0, 0.7) });
 const motaTex = ambiente.brilloTex;
 
 // ------------------------------------------------------------------ carga
@@ -96,11 +119,25 @@ const promesaPaula = cargador.loadAsync("assets/paula.glb").then((g) => {
   paula.position.copy(POS_INICIO);
   { const m = POS_CAJA.clone().sub(POS_INICIO); paula.rotation.y = Math.atan2(m.x, m.z); }
   escena.add(paula);
+  if (!SOMBRAS) {                 // sombra suave pintada bajo Paula (sin mapa de sombras)
+    sombraPaula = sombraBlanda(0.62, 0.42); escena.add(sombraPaula);
+  }
   mezclador = new THREE.AnimationMixer(paula);
   for (const clip of g.animations) acciones[clip.name] = mezclador.clipAction(clip);
   for (const n of ["Interact", "PickUp_Table"]) if (acciones[n]) { acciones[n].setLoop(THREE.LoopOnce); acciones[n].clampWhenFinished = true; }
   pon("Idle_Loop", 0);
 });
+// sombras pintadas (para móviles: no usan mapa de sombras)
+let sombraPaula = null;
+function sombraBlanda(ancho, opacidad) {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d"), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  r.addColorStop(0, "rgba(0,0,0,1)"); r.addColorStop(0.45, "rgba(0,0,0,0.55)"); r.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = r; g.fillRect(0, 0, 128, 128);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(ancho, ancho), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, opacity: opacidad, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.006; m.renderOrder = 1; return m;
+}
+if (!SOMBRAS) { const s = sombraBlanda(1.0, 0.5); s.position.set(POS_CAJA.x, 0.005, POS_CAJA.z); escena.add(s); }
 const regalo = crearRegalo(escena, { movil: CALIDAD < 2, brilloTex: motaTex, posicion: POS_CAJA, giro: 0.45 });
 caja = regalo.grupo;
 const promesaCaja = Promise.resolve();
@@ -201,6 +238,7 @@ ui.empezar.onclick = () => {
   setTimeout(() => { ui.pista.classList.remove("oculto"); ui.sonido.classList.remove("oculto"); }, 700);
   estado.fase = "juego"; estado.inicioJuego = reloj.elapsedTime;
   nota(hz(79), 0, 1.2, 0.08);
+  if (MODO2D) { ui.pista.textContent = "Tienes un regalo"; estado.fase = "cerca"; setTimeout(() => ui.abrir.classList.remove("oculto"), 900); }
 };
 ui.abrir.onclick = () => abrirRegalo();
 ui.otra.onclick = () => location.reload();
@@ -231,6 +269,14 @@ const suave = (x) => x * x * (3 - 2 * x), sale = (x) => 1 - Math.pow(1 - x, 3);
 
 function abrirRegalo() {
   if (estado.fase !== "cerca") return;
+  if (MODO2D) {                    // regalo en 2D: se agita, salta la tapa y sale la luz
+    estado.fase = "abriendo"; ui.abrir.classList.add("oculto"); ui.pista.classList.add("oculto");
+    document.getElementById("regalo2d").classList.add("abierto");
+    sonidoCinta(); setTimeout(() => sonidoRasgar(1), 600); setTimeout(() => { sonidoCarton(); campanitas(); }, 1300);
+    setTimeout(() => { ui.destello.style.opacity = 1; }, 2600);
+    setTimeout(() => empiezaRecuerdos(), 3600);
+    return;
+  }
   estado.fase = "abriendo"; estado.objetivo = null;
   ui.abrir.classList.add("oculto"); ui.pista.classList.add("oculto");
   const mira = POS_CAJA.clone().sub(paula.position); paula.rotation.y = Math.atan2(mira.x, mira.z);
@@ -340,7 +386,7 @@ renderer.setAnimationLoop(() => {
     const a = anim[i]; if (t < a.t0) continue;
     const k = Math.min((t - a.t0) / a.dur, 1); a.fn(k); if (k >= 1) { anim.splice(i, 1); a.fin && a.fin(); }
   }
-  if (paula && (estado.fase === "juego" || estado.fase === "cerca")) {
+  if (!MODO2D && paula && (estado.fase === "juego" || estado.fase === "cerca")) {
     // teclado
     const tk = estado.teclas, dir = new THREE.Vector3((tk.arrowright || tk.d ? 1 : 0) - (tk.arrowleft || tk.a ? 1 : 0), 0, (tk.arrowdown || tk.s ? 1 : 0) - (tk.arrowup || tk.w ? 1 : 0));
     if (dir.lengthSq()) { estado.tocado = true; ui.pista.classList.add("oculto"); estado.objetivo = destinoCercaDeLaCaja(paula.position.clone().add(dir.setLength(0.6))); }
@@ -369,6 +415,7 @@ renderer.setAnimationLoop(() => {
     }
   }
   if (mezclador) mezclador.update(dt);
+  if (sombraPaula) sombraPaula.position.set(paula.position.x, 0.006, paula.position.z);
   if (marca.material.opacity > 0) { marca.material.opacity = Math.max(0, marca.material.opacity - dt * 1.2); marca.scale.multiplyScalar(1 + dt * 0.8); }
   ambiente.actualizar(t, dt); regalo.actualizar(t, dt);
   if (caja && estado.fase !== "abriendo" && estado.fase !== "entrando" && estado.fase !== "recuerdos") caja.position.y = Math.max(0, Math.sin(t * 3.2) * 0.012);
