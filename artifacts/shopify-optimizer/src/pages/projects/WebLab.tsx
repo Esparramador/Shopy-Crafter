@@ -19,6 +19,7 @@ function SecretReveal({ masked, value }: { masked: string; value?: string }) {
 import { useRoute, useLocation } from "wouter";
 import { scoreColor } from "@/lib/utils";
 import { LiveOperation } from "@/components/LiveOperation";
+import { SkillsLab } from "./web-lab/SkillsLab";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
@@ -770,7 +771,9 @@ function Effects3DPanel({ data, activeTab, setActiveTab, copied, setCopied }: {
 
 function WebLabInner({ projectId }: { projectId: number }) {
   const [, navigate] = useLocation();
-  const [labMode, setLabMode] = useState<"analysis" | "demos">("analysis");
+  const [labMode, setLabMode] = useState<"analysis" | "demos" | "skills">("analysis");
+  const [skillToOpen, setSkillToOpen] = useState<string | null>(null);
+  const openSkill = useCallback((id: string) => { setSkillToOpen(id); setLabMode("skills"); window.scrollTo({ top: 0, behavior: "smooth" }); }, []);
   const [url, setUrl] = useState("");
   const [instagram, setInstagram] = useState("");
   const [brandName, setBrandName] = useState("");
@@ -1566,6 +1569,8 @@ ${body}
             <p style={{ color: "var(--t2, #aaa)", fontSize: 14, margin: 0 }}>
               {labMode === "analysis"
                 ? "Analiza cualquier página web y genera CSS/HTML mejorado con IA. Extrae el código real listo para tu equipo de desarrollo."
+                : labMode === "skills"
+                ? "Elige una skill real de agencia o de ciberseguridad, dale lo que pide y ejecútala con el motor de la plataforma."
                 : "26 demos premium de efectos visuales, Three.js, GSAP y UI Components — código vanilla listo para producción."}
             </p>
           </div>
@@ -1573,6 +1578,7 @@ ${body}
             {([
               { id: "analysis", label: "🔬 Análisis Web", desc: "AI Lab" },
               { id: "demos", label: "🎨 Demo Library", desc: "26 efectos" },
+              { id: "skills", label: "🧩 Skills", desc: "Ejecutar skills" },
             ] as const).map(m => (
               <button
                 key={m.id}
@@ -1593,6 +1599,9 @@ ${body}
 
       {/* Demo Library mode */}
       {labMode === "demos" && <DemoLibrary />}
+
+      {/* Skills: seleccionar y ejecutar de verdad */}
+      {labMode === "skills" && <SkillsLab projectId={projectId} defaultUrl={url.trim() || undefined} initialSkillId={skillToOpen} />}
 
       {/* Analysis mode */}
       {labMode === "analysis" && <>
@@ -2336,7 +2345,12 @@ ${body}
                                   )}
                                   {f.relatedSkills && f.relatedSkills.length > 0 && (
                                     <p style={{ fontSize: 11, color: "#bfdbfe", margin: "4px 0 0", lineHeight: 1.6 }}>
-                                      🔗 <b>Skills relacionadas:</b> {f.relatedSkills.map(s => s.name).join(", ")}
+                                      🔗 <b>Skills relacionadas:</b>{" "}
+                                      {f.relatedSkills.map((s, si) => (
+                                        <button key={s.id} type="button" onClick={() => openSkill(`cybersec:${s.id}`)} title="Abrir y ejecutar esta skill" style={{ background: "none", border: "none", padding: 0, color: "#93c5fd", textDecoration: "underline", cursor: "pointer", fontSize: 11 }}>
+                                          {s.name}{si < f.relatedSkills!.length - 1 ? ", " : ""}
+                                        </button>
+                                      ))}
                                     </p>
                                   )}
                                 </div>
