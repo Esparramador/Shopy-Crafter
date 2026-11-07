@@ -58,11 +58,16 @@ export interface RunwayVideoResult {
   hasAudio?: boolean;      // Nuevo: confirmación de audio
 }
 
+/** Convierte la clave interna al ID exacto del endpoint image_to_video. */
+export function runwayImageToVideoModelId(model: RunwayModel): string {
+  return model === "gen4_5" || model === "gen4_5_turbo" ? "gen4.5" : model;
+}
+
 const COST_PER_SECOND: Record<RunwayModel, number> = {
   gen3a_turbo:     0.03,
   gen4_turbo:      0.05,
   "gen4_5":        0.12,  // Gen-4.5: 12 créditos/s (API: "gen4.5")
-  "gen4_5_turbo":  0.12,  // no existe en la API → se envía como gen4.5
+  "gen4_5_turbo":  0.12,  // Alias interno; se envía como el ID API "gen4.5"
   seedance2:       0.10,
   seedance2_fast:  0.06,
   gen4_aleph:      0.08,
@@ -302,9 +307,9 @@ export async function generateVideoFromImage(
   const model: RunwayModel = req.model ?? "gen4_5";
   const duration: RunwayDuration = req.duration ?? 5;
   const ratio: RunwayRatio = req.ratio ?? "1280:768";
-  // IDs y ratios que acepta la API (docs.dev.runwayml.com): Gen-4.5 es "gen4.5";
+  // El esquema oficial de image_to_video fija el ID de Gen-4.5 como "gen4.5".
   // gen4 usa 1280:720 / 720:1280 / 1104:832 / 832:1104 / 960:960 / 1584:672.
-  const apiModel = model === "gen4_5" || model === "gen4_5_turbo" ? "gen4.5" : model;
+  const apiModel = runwayImageToVideoModelId(model);
   const isGen4 = apiModel === "gen4.5" || apiModel === "gen4_turbo";
   const GEN4_RATIO: Partial<Record<RunwayRatio, string>> = {
     "1280:768": "1280:720", "1920:1080": "1280:720", "3840:2160": "1280:720",
