@@ -245,14 +245,14 @@ export const SHOP_SEED: SeedProduct[] = [
   {
     slug: "tarjetas-metalicas", kind: "physical", category: "tarjetas", featured: true, visible: true, sortOrder: 0,
     name: "Tarjetas de visita de aluminio",
-    tagline: "Aluminio lacado grabado con láser, desde 0,35 € la tarjeta. A una cara o a doble cara con tu QR.",
-    description: "Tarjetas de 85,5 × 54 mm en aluminio lacado negro de 0,2 mm, grabadas una a una con el láser infrarrojo de nuestra xTool F2. El grabado no es tinta: es el propio metal, así que no se borra ni se despega.\n\nA una cara llevan tu logo, tus datos y el QR en el mismo lado. A doble cara, delante va tu logo, una ilustración o una foto y detrás tus datos y un QR que lleva a donde tú quieras. Se piden a partir de 100 tarjetas: 0,35 € cada una a una cara y 0,45 € a doble cara. Incluimos el diseño básico a partir de tu logo y te enviamos la prueba antes de grabar.",
-    features: ["Aluminio lacado negro, 85,5 × 54 × 0,2 mm", "A una cara (0,35 €/ud.) o a doble cara (0,45 €/ud.)", "Pedido mínimo: 100 tarjetas", "QR a tu web, Instagram, WhatsApp o reseñas", "Diseño básico y prueba antes de grabar incluidos", "Envío en 3 a 5 días laborables"],
+    tagline: "Aluminio lacado grabado con láser, a 0,45 € la tarjeta, a una o a doble cara con tu QR.",
+    description: "Tarjetas de 85,5 × 54 mm en aluminio lacado negro de 0,2 mm, grabadas una a una con el láser infrarrojo de nuestra xTool F2. El grabado no es tinta: es el propio metal, así que no se borra ni se despega.\n\nA una cara llevan tu logo, tus datos y el QR en el mismo lado. A doble cara, delante va tu logo, una ilustración o una foto y detrás tus datos y un QR que lleva a donde tú quieras. Se piden a partir de 100 tarjetas: 0,45 € cada una, a una o a doble cara. Incluimos el diseño básico a partir de tu logo y te enviamos la prueba antes de grabar.",
+    features: ["Aluminio lacado negro, 85,5 × 54 × 0,2 mm", "0,45 €/ud., a una o a doble cara", "Pedido mínimo: 100 tarjetas", "QR a tu web, Instagram, WhatsApp o reseñas", "Diseño básico y prueba antes de grabar incluidos", "Envío en 3 a 5 días laborables"],
     media: [img("demo-tarjetas-metalicas-1", "Tarjetas de visita de aluminio (imagen de demostración)"), img("demo-tarjetas-metalicas-2", "Tarjetas de visita de aluminio (imagen de demostración)"), vid("3d-tarjetas-metalicas", "Giro 3D de la tarjeta de aluminio grabada"), vid("taller-grabado-tarjeta", "Tarjeta grabándose en la xTool F2")],
-    // 0,35 € y 0,45 € por tarjeta son el precio mínimo: no hay tramos por debajo.
+    // 0,45 € por tarjeta, a una o a doble cara, es el precio mínimo: no hay tramos por debajo.
     variants: [
       { key: "doble-cara", name: "Doble cara", tiers: tiers([100, 45]) },
-      { key: "una-cara", name: "Una cara", tiers: tiers([100, 35]) },
+      { key: "una-cara", name: "Una cara", tiers: tiers([100, 45]) },
     ],
     addons: [
       { key: "diseno-a-medida", name: "Diseño a medida desde cero", cents: 1900, perUnit: false, description: "Diseñamos la tarjeta completa aunque no tengas logo." },

@@ -20,7 +20,7 @@ function Words({ text }: { text: string }) {
   return <>{words.map((w, i) => <Fragment key={i}><span className="shop-w"><span>{w}</span></span>{i < words.length - 1 ? " " : null}</Fragment>)}</>;
 }
 
-const MARQUEE = ["Stands con QR para reseñas, wifi o carta", "Tarjetas con foto y mensaje", "Grabado láser en Barcelona", "Tarjetas de aluminio desde 0,35 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Webs, Google y reseñas · precios a partir de"];
+const MARQUEE = ["Stands con QR para reseñas, wifi o carta", "Tarjetas con foto y mensaje", "Grabado láser en Barcelona", "Tarjetas de aluminio a 0,45 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Webs, Google y reseñas · precios a partir de"];
 
 function ProductCard({ p }: { p: Product }) {
   const cover = coverOf(p);
@@ -178,7 +178,7 @@ export default function Shop() {
         start: "top 92%", once: true,
         onEnter: els => gsap.fromTo(els, { y: 60, opacity: 0, rotateX: -14, scale: 0.94 }, { y: 0, opacity: 1, rotateX: 0, scale: 1, duration: 0.85, stagger: 0.08, ease: "power3.out", overwrite: "auto" }),
       });
-      // Bloque de tarjetas: imagen con parallax y precio que cuenta hasta 0,35 €.
+      // Bloque de tarjetas: imagen con parallax y precio que cuenta hasta 0,45 €.
       gsap.fromTo(".shop-offer-media img", { yPercent: -12, scale: 1.15 }, { yPercent: 12, scale: 1.05, ease: "none", scrollTrigger: { trigger: ".shop-offer", start: "top bottom", end: "bottom top", scrub: true } });
       gsap.fromTo(promoPrice.current, { scale: 0.4, opacity: 0, rotate: -8 }, { scale: 1, opacity: 1, rotate: 0, duration: 1.1, ease: "elastic.out(1, 0.45)", scrollTrigger: { trigger: ".shop-offer", start: "top 75%", once: true } });
       gsap.from(".shop-offer-list li", { x: -30, opacity: 0, stagger: 0.08, duration: 0.6, ease: "power3.out", scrollTrigger: { trigger: ".shop-offer", start: "top 70%", once: true } });
@@ -273,7 +273,7 @@ export default function Shop() {
             <span className="shop-eyebrow">Tarjetas de visita de aluminio</span>
             <h2 id="oferta-h">Desde <strong ref={promoPrice} className="shop-offer-price">{euros(cardFrom)}</strong> la tarjeta.</h2>
             <ul className="shop-offer-list">
-              <li><b>Una cara · 0,35 €</b> logo, datos y QR en el mismo lado</li>
+              <li><b>Una cara · 0,45 €</b> logo, datos y QR en el mismo lado</li>
               <li><b>Doble cara · 0,45 €</b> tu diseño delante, datos y QR detrás</li>
               <li><b>Desde 100 tarjetas</b> con diseño básico y prueba incluidos</li>
             </ul>

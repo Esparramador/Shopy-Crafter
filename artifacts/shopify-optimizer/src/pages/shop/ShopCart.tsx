@@ -93,7 +93,7 @@ export default function ShopCart() {
           <div className="shop-empty">
             <p>Todavía no has añadido nada. Empieza por lo más pedido:</p>
             <div className="shop-hero-ctas" style={{ justifyContent: "center" }}>
-              <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas desde 0,35 € →</Link>
+              <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas desde 0,45 € →</Link>
               <Link href="/tienda" className="shop-btn shop-btn-ghost shop-btn-lg">Ver la tienda</Link>
             </div>
           </div>

@@ -18,14 +18,14 @@ describe("catálogo de la tienda", () => {
     }
   });
 
-  it("tarjetas de aluminio: 0,45 € doble cara y 0,35 € una cara, mínimo 100 y sin bajar de ahí", () => {
+  it("tarjetas de aluminio: 0,45 € a una o a doble cara, mínimo 100 y sin bajar de ahí", () => {
     const p = bySlug("tarjetas-metalicas");
     const fields = { nombre: "Joan" };
     expect(priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 100, fields }).totalCents).toBe(4500);
-    expect(priceLine(p, { slug: p.slug, variant: "una-cara", qty: 100, fields }).totalCents).toBe(3500);
+    expect(priceLine(p, { slug: p.slug, variant: "una-cara", qty: 100, fields }).totalCents).toBe(4500);
     expect(priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 1000, fields }).unitCents).toBe(45);
-    expect(priceLine(p, { slug: p.slug, variant: "una-cara", qty: 1000, fields }).unitCents).toBe(35);
-    for (const v of p.variants) for (const t of v.tiers) expect(t.unitCents).toBeGreaterThanOrEqual(v.key === "una-cara" ? 35 : 45);
+    expect(priceLine(p, { slug: p.slug, variant: "una-cara", qty: 1000, fields }).unitCents).toBe(45);
+    for (const v of p.variants) for (const t of v.tiers) expect(t.unitCents).toBeGreaterThanOrEqual(45);
     expect(() => priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 50, fields })).toThrow(ShopValidationError);
     expect(() => priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 150, fields })).toThrow(ShopValidationError);
     const conExtras = priceLine(p, { slug: p.slug, variant: "doble-cara", qty: 250, addons: ["diseno-a-medida", "tarjeta-digital"], fields });
