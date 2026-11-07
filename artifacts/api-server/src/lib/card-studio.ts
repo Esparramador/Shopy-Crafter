@@ -457,7 +457,7 @@ DEVUELVE JSON:
 }
 
 /**
- * Potencia el prompt de fondo con xAI (grok-3-mini-fast) para obtener
+ * Potencia el prompt de fondo con xAI (grok-4.3; grok-3-mini-fast ya no existe) para obtener
  * texturas más sofisticadas y coherentes con el sistema de diseño de la tarjeta.
  * Si falla, devuelve el prompt original sin interrumpir el pipeline.
  */
@@ -524,7 +524,7 @@ Transform the prompt into a rich, specific texture/material description suitable
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "grok-3-mini-fast",
+        model: "grok-4.3",
         messages: [
           { role: "system", content: systemMsg },
           { role: "user", content: userMsg },

@@ -1579,7 +1579,7 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
             <div style={{ marginTop: 8 }}>
               {[
                 { key: "grok-imagine-video", label: "Grok Imagine Video", desc: "Estándar — 720p, hasta 15s, $0.07/s" },
-                { key: "grok-imagine-video-1.5-preview", label: "Grok Imagine Video 1.5 Preview", desc: "Mayor calidad — 720p, hasta 15s, $0.14/s" },
+                { key: "grok-imagine-video-1.5", label: "Grok Imagine Video 1.5", desc: "Mayor calidad — 720p, hasta 15s, $0.14/s" },
               ].map(m => (
                 <button key={m.key} onClick={() => setXaiModel(m.key)} style={{ ...cardButton(xaiModel === m.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
                   <strong style={{ fontSize: 12 }}>{m.label}</strong>

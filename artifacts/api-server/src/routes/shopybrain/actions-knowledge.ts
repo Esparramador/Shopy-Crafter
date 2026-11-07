@@ -193,8 +193,8 @@ export async function runKnowledgeActions(ctx: BrainActionCtx): Promise<BrainAct
           const provider = String(params?.provider || "");
           const tier = String(params?.tier || "");
           const model = params?.model === null || params?.model === undefined ? null : String(params?.model);
-          if (provider !== "claude" && provider !== "gemini") {
-            res.status(400).json({ error: "provider debe ser 'claude' o 'gemini'" });
+          if (provider !== "claude" && provider !== "gemini" && provider !== "xai") {
+            res.status(400).json({ error: "provider debe ser 'claude', 'gemini' o 'xai'" });
             return;
           }
           if (!["fast", "smart", "genius", "vision"].includes(tier)) {

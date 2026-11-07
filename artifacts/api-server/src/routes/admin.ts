@@ -1038,14 +1038,14 @@ router.get("/ai-models", async (_req, res) => {
 
 /**
  * POST /api/admin/ai-models
- * Body: { provider: "claude"|"gemini", tier: "fast"|"smart"|"genius"|"vision", model: string|null }
+ * Body: { provider: "claude"|"gemini"|"xai", tier: "fast"|"smart"|"genius"|"vision", model: string|null }
  * Sets a per-tier override in platform_settings (null clears it). Admin only.
  */
 router.post("/ai-models", async (req, res) => {
   try {
     const { provider, tier, model } = (req.body ?? {}) as { provider?: string; tier?: string; model?: string | null };
-    if (provider !== "claude" && provider !== "gemini") {
-      res.status(400).json({ error: "provider must be 'claude' or 'gemini'" });
+    if (provider !== "claude" && provider !== "gemini" && provider !== "xai") {
+      res.status(400).json({ error: "provider must be 'claude', 'gemini' or 'xai'" });
       return;
     }
     if (tier !== "fast" && tier !== "smart" && tier !== "genius" && tier !== "vision") {
@@ -1062,6 +1062,28 @@ router.post("/ai-models", async (req, res) => {
     res.json({ ok: true, matrix });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || "ai-models write failed" });
+  }
+});
+
+/**
+ * GET /api/admin/ai-models/xai-live
+ * Pide GET https://api.x.ai/v1/models con XAI_API_KEY y lo cruza con el
+ * catálogo y los defaults de xAI de la plataforma (confirmed / missing /
+ * notInCatalog). Solo lectura. Sin clave → { ok:false, reason:"no_key" }.
+ */
+router.get("/ai-models/xai-live", async (_req, res) => {
+  try {
+    const { getAIModelMatrix, KNOWN_MODELS } = await import("../lib/ai-models.js");
+    const { fetchXaiModels } = await import("../lib/xai-models.js");
+    const matrix = await getAIModelMatrix();
+    const platformIds = [
+      ...KNOWN_MODELS.xai.map(m => m.id),
+      ...Object.values(matrix.xai).map(t => t.current),
+    ];
+    const result = await fetchXaiModels(platformIds);
+    res.status(result.ok || result.reason === "no_key" ? 200 : 502).json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "xai-live check failed" });
   }
 });
 

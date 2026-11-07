@@ -9,8 +9,8 @@ const MAX_PROMPT_LENGTH = 1000;
 export type RunwayModel =
   | "gen3a_turbo"
   | "gen4_turbo"
-  | "gen4_5"           // Jun-2026: nueva generación, mejor motion y detalle (API ID oficial)
-  | "gen4_5_turbo"     // Jun-2026: versión rápida de 4.5
+  | "gen4_5"           // Clave interna de Gen-4.5; a la API se envía "gen4.5" (docs.dev.runwayml.com/guides/models)
+  | "gen4_5_turbo"     // No existe en la API (no está en la lista oficial): se envía como "gen4.5"
   | "seedance2"        // Seedance 2 vía Runway, calidad cinematográfica
   | "seedance2_fast"   // Seedance 2 Fast vía Runway, rápido
   | "gen4_aleph"       // Runway Gen-4 Aleph — Video-to-Video contextual editing
