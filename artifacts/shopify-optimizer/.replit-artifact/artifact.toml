@@ -709,6 +709,110 @@ to = "/tienda__pack-google-local.html"
 [[services.production.rewrites]]
 from = "/tienda/pack-google-local/"
 to = "/tienda__pack-google-local.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-resenas-google"
+to = "/tienda__stand-qr-resenas-google.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-resenas-google/"
+to = "/tienda__stand-qr-resenas-google.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-instagram"
+to = "/tienda__stand-qr-instagram.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-instagram/"
+to = "/tienda__stand-qr-instagram.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-pago"
+to = "/tienda__stand-qr-pago.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-pago/"
+to = "/tienda__stand-qr-pago.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-fidelizacion"
+to = "/tienda__stand-qr-fidelizacion.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-fidelizacion/"
+to = "/tienda__stand-qr-fidelizacion.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-wifi"
+to = "/tienda__stand-qr-wifi.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-qr-wifi/"
+to = "/tienda__stand-qr-wifi.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-doble-qr"
+to = "/tienda__stand-doble-qr.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stand-doble-qr/"
+to = "/tienda__stand-doble-qr.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stands-qr-mesa"
+to = "/tienda__stands-qr-mesa.html"
+
+[[services.production.rewrites]]
+from = "/tienda/stands-qr-mesa/"
+to = "/tienda__stands-qr-mesa.html"
+
+[[services.production.rewrites]]
+from = "/tienda/mini-qr-madera-50"
+to = "/tienda__mini-qr-madera-50.html"
+
+[[services.production.rewrites]]
+from = "/tienda/mini-qr-madera-50/"
+to = "/tienda__mini-qr-madera-50.html"
+
+[[services.production.rewrites]]
+from = "/tienda/set-mostrador-qr"
+to = "/tienda__set-mostrador-qr.html"
+
+[[services.production.rewrites]]
+from = "/tienda/set-mostrador-qr/"
+to = "/tienda__set-mostrador-qr.html"
+
+[[services.production.rewrites]]
+from = "/tienda/tarjeta-mensaje-aluminio"
+to = "/tienda__tarjeta-mensaje-aluminio.html"
+
+[[services.production.rewrites]]
+from = "/tienda/tarjeta-mensaje-aluminio/"
+to = "/tienda__tarjeta-mensaje-aluminio.html"
+
+[[services.production.rewrites]]
+from = "/tienda/serie-tarjetas-recuerdos"
+to = "/tienda__serie-tarjetas-recuerdos.html"
+
+[[services.production.rewrites]]
+from = "/tienda/serie-tarjetas-recuerdos/"
+to = "/tienda__serie-tarjetas-recuerdos.html"
+
+[[services.production.rewrites]]
+from = "/tienda/regalo-serie-web"
+to = "/tienda__regalo-serie-web.html"
+
+[[services.production.rewrites]]
+from = "/tienda/regalo-serie-web/"
+to = "/tienda__regalo-serie-web.html"
+
+[[services.production.rewrites]]
+from = "/tienda/tarjetas-invitados"
+to = "/tienda__tarjetas-invitados.html"
+
+[[services.production.rewrites]]
+from = "/tienda/tarjetas-invitados/"
+to = "/tienda__tarjetas-invitados.html"
 # rewrites:auto:end
 
 [[services.production.rewrites]]
