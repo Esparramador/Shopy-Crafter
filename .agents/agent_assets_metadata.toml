@@ -879,3 +879,17 @@ mtime_ms = 1793358661558
 storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/163abff8-af63-4516-9d62-911a596f393d/33c41729-8ff7-42db-84d2-99694c777d86"
 storage_version_token = "1793388274382838"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "CHEmmCQjFxXyMj3wVmnnd"
+uri = "file://generated-artifacts/tareas-sugeridas-proyecto-2026-11-07.zip"
+type = "unspecified"
+title = "Tareas sugeridas del proyecto (ZIP)"
+description = "Archivo ZIP con las 45 tareas actualmente sugeridas, incluyendo índice, JSON completo y una ficha Markdown detallada por tarea."
+logical_id = "ae7dc26b-003e-431a-9355-ae4e61880700"
+content_hash = "sha256:10a0ae77f6c2d6073ac8448ceb535ea5748a68ba1887f52e7fdbb1cb3cc78eb0"
+size = 58320
+mtime_ms = 1794071869305
+storage_uri = "gcs://replit-rams-assets-worf/rams/assets/repl:c104008b-b6fa-4bd6-96fb-4cf699ca4074/ae7dc26b-003e-431a-9355-ae4e61880700/3b3ff535-2abc-482d-b41a-7f602b56fec3"
+storage_version_token = "1794071873676144"
+content_type = "application/octet-stream"
