@@ -148,15 +148,9 @@ const publicVoiceLimiter = rateLimit({
   skip: (_req) => process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
 });
 
-const contactLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  store: new PgRateLimitStore("contact"),
-  message: { error: "Has enviado varias solicitudes seguidas. Te responderemos en breve.", code: "RATE_LIMITED" },
-  skip: (req) => req.method !== "POST" || process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test",
-});
+// El formulario de contacto (POST /api/contact) no lleva limitador aquí: su cupo
+// persistente de 5 solicitudes nuevas por hora se aplica dentro de la ruta
+// (routes/contact.ts), después de reconocer los reintentos idempotentes.
 
 // Chat de la landing: además del límite por minuto, 80 mensajes al día por IP.
 const publicAiDailyLimiter = rateLimit({
@@ -361,7 +355,6 @@ app.use("/api/auth", authLimiter);
 app.use("/api/public/landing-chat", publicAiLimiter);
 app.use("/api/public/landing-chat", publicAiDailyLimiter);
 app.use("/api/voice/public-call-url", publicVoiceLimiter);
-app.use("/api/contact", contactLimiter);
 app.use("/api/shop/uploads", shopUploadLimiter);
 app.use("/api/shop/checkout", shopCheckoutLimiter);
 // Tarjetas públicas por id secuencial: limita la enumeración masiva (un QR
