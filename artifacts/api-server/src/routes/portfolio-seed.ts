@@ -161,6 +161,127 @@ export function mergeGenericSeedCopy(
 }
 
 /**
+ * Lo que la semilla escribió por última vez en una fila (columna portfolio_projects.seed_defaults).
+ * En la siguiente versión, cada campo que siga igual que esto se considera «por defecto» y recibe
+ * el valor nuevo; el que difiera lo ha cambiado alguien desde el panel y se conserva.
+ */
+export interface SeedDefaults {
+  title: string; client: string | null; category: string; status: string;
+  summary: string; description: string; features: string[]; tech: string[];
+  liveUrl: string | null; appUrl: string | null; images: SeedImage[]; sortOrder: number;
+  variants: SeedVariant[];
+}
+export type SeedRowState = SeedDefaults;
+
+const SEED_FIELDS = [
+  "title", "client", "category", "status", "summary", "description",
+  "features", "tech", "liveUrl", "appUrl", "sortOrder",
+] as const satisfies readonly (keyof SeedDefaults)[];
+const VARIANT_FIELDS = ["client", "status", "summary", "description", "features", "tech", "images"] as const;
+
+export function seedDefaultsOf(p: SeedProject): SeedDefaults {
+  const { slug: _slug, ...rest } = p;
+  return structuredClone(rest);
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => sameValue(x, b[i]));
+  if (a && b && typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+    const ka = Object.keys(a).filter(k => (a as Record<string, unknown>)[k] !== undefined);
+    const kb = Object.keys(b).filter(k => (b as Record<string, unknown>)[k] !== undefined);
+    return ka.length === kb.length && ka.every(k => sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+  }
+  return false;
+}
+
+/** Valores por defecto anteriores de filas sembradas antes de que existiera seed_defaults. */
+export function legacySeedDefaults(slug: string): Partial<SeedDefaults> | null {
+  const description = GENERIC_V1[slug];
+  const copy = GENERIC_V1_COPY[slug];
+  if (description === undefined) return null;
+  if (!copy) throw new Error(`Missing previous generic copy snapshot for portfolio seed: ${slug}`);
+  return { ...copy, description };
+}
+
+/**
+ * Variantes campo a campo:
+ *  - variante por defecto (mismo nombre que en la semilla anterior) → cada campo intacto pasa al
+ *    valor nuevo; los editados se quedan;
+ *  - variante por defecto que la semilla nueva ya no trae → se retira solo si sigue entera intacta;
+ *  - variante creada o renombrada desde el panel → no se toca;
+ *  - variante nueva de la semilla → se añade, salvo que ya estuviera antes (si falta, la borraron).
+ */
+export function mergeSeedVariants(
+  current: SeedVariant[],
+  seed: SeedVariant[],
+  previous: SeedVariant[] | undefined,
+): SeedVariant[] {
+  if (!previous) return current;
+  const out: SeedVariant[] = [];
+  for (const v of current) {
+    const prev = previous.find(x => x.name === v.name);
+    if (!prev) { out.push(v); continue; }
+    const fresh = seed.find(x => x.name === v.name);
+    if (!fresh) {
+      if (!sameValue(v, prev)) out.push(v);
+      continue;
+    }
+    const merged = { ...v };
+    for (const f of VARIANT_FIELDS) {
+      if (sameValue(v[f], prev[f])) (merged as unknown as Record<string, unknown>)[f] = structuredClone(fresh[f]);
+    }
+    out.push(merged);
+  }
+  for (const fresh of seed) {
+    if (previous.some(x => x.name === fresh.name)) continue;
+    if (out.some(x => x.name === fresh.name)) continue;
+    out.push(structuredClone(fresh));
+  }
+  return out;
+}
+
+/**
+ * Fusiona una fila existente con la versión nueva de la semilla, campo a campo.
+ * `previous` es lo que la semilla había escrito (seed_defaults); los campos sin valor anterior
+ * conocido se conservan. Las imágenes vacías se rellenan y una URL vacía recibe la de la semilla.
+ */
+export function mergeSeedProject(
+  row: SeedRowState,
+  seed: SeedProject,
+  previous: Partial<SeedDefaults> | null,
+): SeedRowState {
+  const next: SeedRowState = { ...row };
+  for (const f of SEED_FIELDS) {
+    if (previous && f in previous && sameValue(row[f], previous[f])) {
+      (next as unknown as Record<string, unknown>)[f] = structuredClone(seed[f]);
+    }
+  }
+  if (next.liveUrl === null) next.liveUrl = seed.liveUrl;
+  if (next.appUrl === null) next.appUrl = seed.appUrl;
+  const hasImages = Array.isArray(row.images) && row.images.length > 0;
+  if (!hasImages || (previous?.images && sameValue(row.images, previous.images))) {
+    next.images = hasImages || seed.images.length > 0 ? structuredClone(seed.images) : row.images;
+  }
+  next.variants = mergeSeedVariants(Array.isArray(row.variants) ? row.variants : [], seed.variants, previous?.variants);
+  return next;
+}
+
+/**
+ * Proyectos de la semilla que el dueño confirma haber borrado ANTES de que existiera el registro
+ * de borrados (portfolio_deleted_projects). Solo se anotan si el slug es de la semilla y no hay
+ * fila con ese slug: nunca se deduce un borrado por ausencia. Vacía hasta que el dueño confirme;
+ * también se puede confirmar uno a uno desde Admin → Portfolio → «Borrados».
+ */
+export const PRE_LEDGER_DELETED_SLUGS: string[] = [];
+
+/** Filtra los slugs confirmados a los que pueden anotarse: de la semilla y sin fila viva. */
+export function confirmedPreLedgerDeletions(confirmed: readonly string[], existingSlugs: ReadonlySet<string>): string[] {
+  const seedSlugs = new Set(SEED.map(p => p.slug));
+  return [...new Set(confirmed)].filter(slug => seedSlugs.has(slug) && !existingSlugs.has(slug));
+}
+
+/**
  * Correcciones puntuales sobre filas YA sembradas (la lista de arriba solo crea las que faltan).
  * Se aplican una vez por PATCH_VERSION (portfolio_meta.patch_version), sin volver a crear
  * proyectos borrados desde el panel:
