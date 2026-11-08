@@ -13,13 +13,80 @@ export const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION?.trim() || "2
 
 const SHOPIFY_FETCH_TIMEOUT = 45_000;
 const TOKEN_OP_TIMEOUT = 20_000;
+const TOKEN_FAILURE_COOLDOWN_MS: Record<ShopifyTokenFailureKind, number> = {
+  store_unavailable: 6 * 60 * 60 * 1000,
+  verification_required: 10 * 60 * 1000,
+  access_denied: 10 * 60 * 1000,
+  invalid_token: 2 * 60 * 1000,
+  invalid_credentials: 30 * 60 * 1000,
+  rate_limited: 60 * 1000,
+  shopify_unavailable: 60 * 1000,
+  network_error: 60 * 1000,
+  unknown: 60 * 1000,
+};
 
 export class ShopifyAuthError extends Error {
   statusCode = 422;
-  constructor(message: string) {
+  shopifyStatus?: number;
+  failureKind?: ShopifyTokenFailureKind;
+
+  constructor(message: string, options: { shopifyStatus?: number; failureKind?: ShopifyTokenFailureKind } = {}) {
     super(message);
     this.name = "ShopifyAuthError";
+    this.shopifyStatus = options.shopifyStatus;
+    this.failureKind = options.failureKind;
   }
+}
+
+export type ShopifyTokenFailureKind =
+  | "store_unavailable"
+  | "verification_required"
+  | "access_denied"
+  | "invalid_token"
+  | "invalid_credentials"
+  | "rate_limited"
+  | "shopify_unavailable"
+  | "network_error"
+  | "unknown";
+
+export interface ShopifyTokenValidation {
+  valid: boolean;
+  status: number | null;
+  failureKind?: ShopifyTokenFailureKind;
+  summary?: string;
+}
+
+const tokenRefreshesInFlight = new Map<number, Promise<string>>();
+const recentTokenFailures = new Map<number, { error: ShopifyAuthError; retryAt: number }>();
+
+export function getRecentShopifyTokenFailure(projectId: number): ShopifyAuthError | null {
+  const recent = recentTokenFailures.get(projectId);
+  if (!recent) return null;
+  if (recent.retryAt <= Date.now()) {
+    recentTokenFailures.delete(projectId);
+    return null;
+  }
+  return recent.error;
+}
+
+export function clearRecentShopifyTokenFailure(projectId: number): void {
+  recentTokenFailures.delete(projectId);
+}
+
+function classifyShopifyFailure(status: number, responseText: string): ShopifyTokenFailureKind {
+  const text = String(responseText ?? "");
+  if (status === 404 || /store unavailable|shop-404|there(?:'|’)s no store|this store is unavailable/i.test(text)) {
+    return "store_unavailable";
+  }
+  if (status === 403 && /verifying your connection|verify(?:ing)? (?:that )?you are|security check|captcha/i.test(text)) {
+    return "verification_required";
+  }
+  if (status === 403) return "access_denied";
+  if (/invalid_client|invalid client|invalid credentials|unauthorized_client/i.test(text)) return "invalid_credentials";
+  if (status === 401) return "invalid_token";
+  if (status === 429) return "rate_limited";
+  if (status >= 500) return "shopify_unavailable";
+  return "unknown";
 }
 
 /**
@@ -41,6 +108,15 @@ export function resumenRespuestaShopify(texto: string): string {
 export function mensajeShopifyUsuario(err: unknown, shopDomain?: string | null): string {
   const m = err instanceof Error ? err.message : String(err ?? "");
   const tienda = shopDomain ? normalizeShopDomain(String(shopDomain)) : "la tienda";
+  if (err instanceof ShopifyAuthError && err.failureKind === "verification_required") {
+    return `Shopify está verificando el acceso a ${tienda}. No se han cambiado las credenciales; vuelve a intentarlo más tarde.`;
+  }
+  if (err instanceof ShopifyAuthError && err.failureKind === "access_denied") {
+    return `Shopify ha bloqueado el acceso a ${tienda}. Revisa los permisos de la app o vuelve a intentarlo más tarde; no cambies las credenciales sin confirmarlo.`;
+  }
+  if (err instanceof ShopifyAuthError && err.failureKind === "invalid_credentials") {
+    return `Shopify ha rechazado las credenciales de la app para ${tienda}. Revísalas en Configuración antes de cambiarlas.`;
+  }
   if (/app_not_installed/i.test(m)) return "La app de Shopify está desinstalada en " + tienda + ". Reinstálala desde el panel de Shopify y vuelve a conectar la tienda.";
   if (/store unavailable|Token generation failed \(404\)|\(404\)/i.test(m)) return `La tienda ${tienda} no está disponible en Shopify (no existe, está cerrada o en pausa). Revisa el dominio .myshopify.com en Configuración o reactiva la tienda en Shopify.`;
   if (/password protected/i.test(m)) return `La tienda ${tienda} tiene la contraseña de tienda cerrada activada: Shopify no deja conectar hasta que se abra.`;
@@ -64,6 +140,46 @@ export async function refreshToken(
   projectId: number,
   shopDomain: string,
   clientId: string,
+  clientSecret: string,
+  options: { force?: boolean } = {}
+): Promise<string> {
+  const activeRefresh = tokenRefreshesInFlight.get(projectId);
+  if (activeRefresh) return activeRefresh;
+  if (options.force) {
+    recentTokenFailures.delete(projectId);
+  } else {
+    const recentFailure = getRecentShopifyTokenFailure(projectId);
+    if (recentFailure) throw recentFailure;
+  }
+
+  let refreshPromise: Promise<string>;
+  refreshPromise = refreshTokenOnce(projectId, shopDomain, clientId, clientSecret)
+    .then((token) => {
+      recentTokenFailures.delete(projectId);
+      return token;
+    })
+    .catch((err: unknown) => {
+      if (err instanceof ShopifyAuthError && err.failureKind) {
+        recentTokenFailures.set(projectId, {
+          error: err,
+          retryAt: Date.now() + TOKEN_FAILURE_COOLDOWN_MS[err.failureKind],
+        });
+      }
+      throw err;
+    })
+    .finally(() => {
+      if (tokenRefreshesInFlight.get(projectId) === refreshPromise) {
+        tokenRefreshesInFlight.delete(projectId);
+      }
+    });
+  tokenRefreshesInFlight.set(projectId, refreshPromise);
+  return refreshPromise;
+}
+
+async function refreshTokenOnce(
+  projectId: number,
+  shopDomain: string,
+  clientId: string,
   clientSecret: string
 ): Promise<string> {
   const domain = normalizeShopDomain(shopDomain);
@@ -84,7 +200,13 @@ export async function refreshToken(
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new ShopifyAuthError(`Token generation failed (${resp.status}): ${resumenRespuestaShopify(text)}`);
+    const failureKind = resp.status === 401
+      ? "invalid_credentials"
+      : classifyShopifyFailure(resp.status, text);
+    throw new ShopifyAuthError(
+      `Token generation failed (${resp.status}): ${resumenRespuestaShopify(text)}`,
+      { shopifyStatus: resp.status, failureKind }
+    );
   }
 
   const data = (await resp.json()) as { access_token: string; expires_in?: number };
@@ -292,7 +414,11 @@ export async function rotateToken(
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new Error(`Token rotation failed (${resp.status}): ${resumenRespuestaShopify(text)}`);
+    const failureKind = classifyShopifyFailure(resp.status, text);
+    throw new ShopifyAuthError(
+      `Token rotation failed (${resp.status}): ${resumenRespuestaShopify(text)}`,
+      { shopifyStatus: resp.status, failureKind }
+    );
   }
 
   const data = (await resp.json()) as { access_token: string; expires_in?: number };
@@ -362,7 +488,7 @@ export async function shopifyGraphQL<T = Record<string, unknown>>(
 /**
  * Validates a token with a lightweight API call. Returns true if valid.
  */
-export async function validateToken(shopDomain: string, accessToken: string): Promise<boolean> {
+export async function validateTokenDetailed(shopDomain: string, accessToken: string): Promise<ShopifyTokenValidation> {
   const domain = normalizeShopDomain(shopDomain);
   const plainToken = safeDecrypt(accessToken) || accessToken;
   try {
@@ -370,9 +496,29 @@ export async function validateToken(shopDomain: string, accessToken: string): Pr
       headers: { "X-Shopify-Access-Token": plainToken, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(TOKEN_OP_TIMEOUT),
     });
-    // Solo 2xx es válido (antes 404 por dominio mal escrito o 5xx contaban como OK).
-    return resp.ok;
-  } catch {
-    return false;
+    if (resp.ok) return { valid: true, status: resp.status };
+
+    const text = await resp.text();
+    let failureKind = classifyShopifyFailure(resp.status, text);
+    // An HTTP 401 from shop.json means the access token is invalid, not that
+    // the app's Client ID/Secret are necessarily wrong.
+    if (resp.status === 401) failureKind = "invalid_token";
+    return {
+      valid: false,
+      status: resp.status,
+      failureKind,
+      summary: resumenRespuestaShopify(text),
+    };
+  } catch (err) {
+    return {
+      valid: false,
+      status: null,
+      failureKind: "network_error",
+      summary: err instanceof Error ? err.message.slice(0, 180) : "network error",
+    };
   }
+}
+
+export async function validateToken(shopDomain: string, accessToken: string): Promise<boolean> {
+  return (await validateTokenDetailed(shopDomain, accessToken)).valid;
 }

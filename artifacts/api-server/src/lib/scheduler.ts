@@ -10,7 +10,13 @@ import { desc, eq, gte, sql, and, inArray } from "drizzle-orm";
 import { businessDayBounds, businessYmd, previousBusinessYmd } from "./tz.js";
 import { fetchOrdersInWindow, isCountableOrder } from "./orders.js";
 import { toLooseNumber } from "./ai-schema.js";
-import { refreshToken, rotateToken, validateToken, shopifyRequest } from "./shopify.js";
+import {
+  ShopifyAuthError,
+  getRecentShopifyTokenFailure,
+  refreshToken,
+  validateTokenDetailed,
+  shopifyRequest,
+} from "./shopify.js";
 import { safeDecrypt } from "./crypto.js";
 import { askClaudeWithBrainDetailed, buildShopyBrainContext, type BrainUseCase } from "./claude.js";
 import { generateAiJson } from "./ai-json.js";
@@ -791,7 +797,7 @@ async function runTokenRefreshImpl() {
   try {
     const projects = await db.select().from(projectsTable);
     let valid = 0;
-    let rotated = 0;
+    let refreshed = 0;
     let failed = 0;
     let noToken = 0;
 
@@ -800,43 +806,98 @@ async function runTokenRefreshImpl() {
       if (((project as { platformType?: string }).platformType ?? "shopify") !== "shopify") continue;
       if (!project.accessToken) {
         noToken++;
-        logger.warn({ projectId: project.id, domain: project.shopDomain }, "Project has no access token");
+        logger.warn(
+          { projectId: project.id, domain: project.shopDomain, connectionStatus: "missing_token" },
+          "Shopify connection needs administrator attention: no access token is stored"
+        );
+        continue;
+      }
+
+      // Startup warmup may already have attempted this project's refresh.
+      // Honor its short failure cooldown instead of producing a second
+      // Shopify request and duplicate startup error for the same connection.
+      if (getRecentShopifyTokenFailure(project.id)) {
+        failed++;
         continue;
       }
 
       try {
         // Renovación preventiva si caduca en < 2 h (antes solo se validaba y el
         // token caducaba igualmente entre ejecuciones).
-        const expiresSoon = !!project.tokenExpiresAt && new Date(project.tokenExpiresAt).getTime() < Date.now() + 2 * 3600 * 1000;
-        const isValid = !expiresSoon && await validateToken(project.shopDomain, project.accessToken);
-        if (isValid) {
+        const expiresSoon = !project.tokenExpiresAt || new Date(project.tokenExpiresAt).getTime() < Date.now() + 2 * 3600 * 1000;
+        const validation = expiresSoon
+          ? null
+          : await validateTokenDetailed(project.shopDomain, project.accessToken);
+        if (validation?.valid) {
           valid++;
           continue;
         }
 
-        log("token-refresh", `⚠️ Token invalid for project ${project.id} (${project.shopDomain}) — attempting refresh via client_credentials`);
+        // A 403 verification/access block or 404 unavailable store does not
+        // mean the saved app credentials are wrong. Do not rotate or overwrite
+        // any token in these cases; make the diagnosis visible and try again
+        // on a later scheduled pass.
+        const blockedKind = validation?.failureKind;
+        if (blockedKind === "store_unavailable" || blockedKind === "verification_required" || blockedKind === "access_denied") {
+          failed++;
+          const logMethod = blockedKind === "store_unavailable" ? "error" : "warn";
+          logger[logMethod](
+            {
+              projectId: project.id,
+              domain: project.shopDomain,
+              connectionStatus: blockedKind,
+              httpStatus: validation?.status,
+              summary: validation?.summary,
+              credentialsChanged: false,
+            },
+            blockedKind === "store_unavailable"
+              ? "Shopify store is unavailable; credentials and project were left unchanged"
+              : "Shopify access is blocked or being verified; no token rotation or credential change attempted"
+          );
+          continue;
+        }
+
+        log(
+          "token-refresh",
+          `🔄 Project ${project.id} (${project.shopDomain}) needs token renewal${validation?.status ? ` after HTTP ${validation.status}` : ""}`
+        );
         const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
         try {
           await refreshToken(project.id, project.shopDomain, project.clientId, plainSecret);
-          rotated++;
+          refreshed++;
           log("token-refresh", `✅ Token refreshed: project ${project.id} (${project.shopDomain})`);
-        } catch (refreshErr) {
-          log("token-refresh", `⚠️ client_credentials failed, trying rotateToken as fallback`);
-          const plainAccessToken = safeDecrypt(project.accessToken ?? "") || (project.accessToken ?? "");
-          await rotateToken(project.id, project.shopDomain, project.clientId, plainSecret, plainAccessToken);
-          rotated++;
-          log("token-refresh", `✅ Token rotated (fallback): project ${project.id} (${project.shopDomain})`);
+        } catch (err) {
+          failed++;
+          const failureKind = err instanceof ShopifyAuthError ? err.failureKind ?? "unknown" : "network_error";
+          const status = err instanceof ShopifyAuthError ? err.shopifyStatus : undefined;
+          logger.error(
+            {
+              projectId: project.id,
+              domain: project.shopDomain,
+              connectionStatus: failureKind,
+              httpStatus: status,
+              credentialsChanged: false,
+              err,
+            },
+            failureKind === "store_unavailable"
+              ? "Shopify store is unavailable; saved credentials and project were left unchanged"
+              : failureKind === "verification_required" || failureKind === "access_denied"
+                ? "Shopify blocked or is verifying token renewal; saved credentials and token were left unchanged"
+                : failureKind === "invalid_credentials"
+                  ? "Shopify rejected the app credentials; no credential replacement was attempted"
+                  : "Shopify token renewal failed; saved credentials and token were left unchanged"
+          );
         }
       } catch (err) {
         failed++;
         logger.error(
-          { projectId: project.id, domain: project.shopDomain, err },
-          "Token invalid and rotation failed — manual update required"
+          { projectId: project.id, domain: project.shopDomain, connectionStatus: "validation_error", err },
+          "Shopify token validation failed; credentials were left unchanged"
         );
       }
     }
 
-    log("token-refresh", `🔑 Done: ${valid} valid, ${rotated} rotated, ${failed} failed, ${noToken} missing`);
+    log("token-refresh", `🔑 Done: ${valid} valid, ${refreshed} refreshed, ${failed} failed, ${noToken} missing`);
   } catch (err) {
     logger.error({ err }, "Token validation job failed");
     throw err; // el fallo global llega a quien lanzó el job (antes se informaba "success")
