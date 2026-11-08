@@ -1227,6 +1227,14 @@ export function registerCronJobs() {
   // 1st of each month 4am — Monthly self-evaluation report
   cron.schedule("0 4 1 * *", () => { runMonthlySelfEvaluation().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });
 
+  // ── SALUD DE LAS LLAMADAS DE VOZ ─────────────────────────────────────────
+  // Cada hora (min. 20) — email al admin si las llamadas de voz pasan a rojo y al recuperarse
+  cron.schedule("20 * * * *", () => {
+    import("./convai-health-alert.js")
+      .then(({ runConvAIHealthAlertJob }) => runConvAIHealthAlertJob())
+      .catch(e => logger.error({ job: "convai-health-alert" }, String(e)));
+  }, { timezone: "Europe/Madrid" });
+
   // ── TOKENS SHOPIFY ────────────────────────────────────────────────────────
   // Cada 20h — Renovar tokens Shopify (duran 24h, renovamos con 4h de margen)
   cron.schedule("5 */20 * * *", () => { runTokenRefresh().catch(e => logger.error(e)); }, { timezone: "Europe/Madrid" });

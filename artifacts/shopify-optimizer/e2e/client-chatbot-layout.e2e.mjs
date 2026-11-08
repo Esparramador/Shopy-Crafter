@@ -27,6 +27,7 @@ import { nanoid } from "nanoid";
 import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { rectOf, inside, overlap } from "./lib/layout.mjs";
 
 const BASE = (process.env.E2E_BASE_URL || `https://${process.env.REPLIT_DEV_DOMAIN}`).replace(/\/$/, "");
 const EMAIL = process.env.E2E_ADMIN_EMAIL || "craftershopy@gmail.com";
@@ -71,13 +72,7 @@ function chromiumPath() {
   try { return execSync("which chromium", { encoding: "utf8" }).trim(); } catch { return undefined; }
 }
 
-const rectOf = (loc) => loc.evaluate((el) => {
-  const r = el.getBoundingClientRect();
-  return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
-});
-const inside = (inner, outer, tol = 0.5) =>
-  inner.x >= outer.x - tol && inner.y >= outer.y - tol && inner.right <= outer.right + tol && inner.bottom <= outer.bottom + tol;
-const overlap = (a, b) => a.x < b.right - 0.5 && b.x < a.right - 0.5 && a.y < b.bottom - 0.5 && b.y < a.bottom - 0.5;
+
 const fmt = (r) => `x=${r.x.toFixed(0)} y=${r.y.toFixed(0)} w=${r.w.toFixed(0)} h=${r.h.toFixed(0)}`;
 
 const browser = await chromium.launch({ executablePath: chromiumPath(), headless: true, args: ["--no-sandbox"] });
