@@ -7,6 +7,26 @@ import Stripe from "stripe";
 const inserts: unknown[] = [];
 const dbUpdates: unknown[] = [];
 const rawSql: string[] = [];
+// Registro de eventos procesados (stripe_webhook_events) simulado: reproduce la reclamación
+// idempotente de handleStripeEvent (done → duplicado; failed → se puede reintentar).
+const stripeEvents = new Map<string, string>();
+function fakeStripeEventsSql(q: { __sql?: string; values?: unknown[] }): { rows: unknown[] } | null {
+  const text = q?.__sql ?? "";
+  if (text.includes("INSERT INTO stripe_webhook_events")) {
+    const id = String(q.values?.[0]);
+    const st = stripeEvents.get(id);
+    if (st === "done" || st === "processing") return { rows: [] };
+    stripeEvents.set(id, "processing");
+    return { rows: [{ event_id: id }] };
+  }
+  if (text.includes("UPDATE stripe_webhook_events")) {
+    const vals = q.values ?? [];
+    stripeEvents.set(String(vals[vals.length - 1]), String(vals[0]));
+    return { rows: [] };
+  }
+  return null;
+}
+
 
 vi.mock("@workspace/db", () => {
   const table = (name: string) => new Proxy({ __name: name }, { get: (t, k) => (k in t ? (t as Record<string | symbol, unknown>)[k] : `${name}.${String(k)}`) });
@@ -16,7 +36,7 @@ vi.mock("@workspace/db", () => {
     referralTrackingTable: table("referral_tracking"),
     usersTable: table("users"),
     db: {
-      execute: async (q: { __sql?: string }) => { if (q?.__sql) rawSql.push(q.__sql); return { rows: [] }; },
+      execute: async (q: { __sql?: string; values?: unknown[] }) => { if (q?.__sql) rawSql.push(q.__sql); return fakeStripeEventsSql(q) ?? { rows: [] }; },
       select: () => ({
         from: () => ({
           where: () => Object.assign([] as unknown[], { limit: async () => [] as unknown[] }),
@@ -29,7 +49,7 @@ vi.mock("@workspace/db", () => {
 });
 vi.mock("drizzle-orm", () => ({
   eq: () => ({}),
-  sql: Object.assign((strings: TemplateStringsArray) => ({ __sql: strings.join("?") }), { raw: () => ({}) }),
+  sql: Object.assign((strings: TemplateStringsArray, ...values: unknown[]) => ({ __sql: strings.join("?"), values }), { raw: () => ({}) }),
 }));
 vi.mock("../lib/auth.js", () => ({ requireAdmin: (_q: unknown, _s: unknown, next: () => void) => next(), requireAuth: (_q: unknown, _s: unknown, next: () => void) => next() }));
 vi.mock("../lib/logger.js", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
@@ -50,7 +70,7 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/billing/stripe/webhook`;
 });
 afterAll(() => { server.close(); });
-beforeEach(() => { inserts.length = 0; dbUpdates.length = 0; rawSql.length = 0; process.env.STRIPE_WEBHOOK_SECRET = SECRET; });
+beforeEach(() => { stripeEvents.clear(); inserts.length = 0; dbUpdates.length = 0; rawSql.length = 0; process.env.STRIPE_WEBHOOK_SECRET = SECRET; });
 
 async function send(event: unknown) {
   const payload = JSON.stringify(event);

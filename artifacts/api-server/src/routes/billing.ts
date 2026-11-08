@@ -13,7 +13,7 @@ import {
   type PackPlatform,
 } from "../lib/plan-catalog.js";
 import {
-  STRIPE_API_VERSION, getStripe, activatePlan, createPlanCheckout, handleStripeEvent,
+  STRIPE_API_VERSION, getStripe, activatePlan, createPlanCheckout, handleStripeEvent, constructStripeWebhookEvent,
   recurringRevenue, ensureStripeBillingSchema, type BillingInterval,
 } from "../lib/stripe-billing.js";
 import { publicAppUrl } from "../lib/account-tokens.js";
@@ -732,18 +732,16 @@ router.post("/billing/stripe/webhook", async (req, res): Promise<void> => {
 
   // Verificar la firma no necesita la API key. Vale cualquiera de los secretos conocidos:
   // el del endpoint que crea la plataforma y el configurado a mano.
-  let event: Stripe.Event | null = null;
-  let lastError = "";
-  for (const secret of secrets) {
-    try { event = Stripe.webhooks.constructEvent(rawBody, sig, secret); break; }
-    catch (err) { lastError = err instanceof Error ? err.message : String(err); }
+  const verified = constructStripeWebhookEvent(rawBody, sig, secrets);
+  if ("error" in verified) {
+    logger.warn({ err: verified.error }, "stripe webhook signature error");
+    res.status(400).json({ error: `Webhook error: ${verified.error}` }); return;
   }
-  if (!event) {
-    logger.warn({ err: lastError }, "stripe webhook signature error");
-    res.status(400).json({ error: `Webhook error: ${lastError}` }); return;
-  }
+  const { event } = verified;
 
   try {
+    // Misma puerta (idempotente por event.id) que /api/webhooks/stripe: una cancelación
+    // se trata igual llegue por la URL que llegue.
     await handleStripeEvent(event);
   } catch (err: any) {
     // 500 → Stripe reintenta el evento más tarde (no se pierde un cobro).

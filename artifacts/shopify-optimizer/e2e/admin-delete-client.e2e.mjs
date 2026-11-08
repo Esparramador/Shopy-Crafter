@@ -18,9 +18,14 @@
 //      Con cualquiera de las dos el backend consulta Stripe, recibe resource_missing y FALLA
 //      CERRADO: muestra el aviso, no cancela, no desactiva, no borra y el DELETE sigue en 409.
 //   6. Un cliente con cancel_at_period_end=1 + current_period_end (sembrado) muestra la fecha.
-//   7. Con E2E_STRIPE_SECRET_KEY crea una suscripción pagada de test, la cancela al final
-//      del periodo desde el panel, y compara la respuesta, DB, lista y cancel_at de Stripe.
-//      Requiere DATABASE_URL + psql.
+//   7. Con E2E_STRIPE_SECRET_KEY crea, bajo un test clock de Stripe, una suscripción pagada de
+//      test, la cancela al final del periodo desde el panel, compara la respuesta, DB, lista y
+//      cancel_at de Stripe, y después AVANZA el reloj más allá de cancel_at para comprobar que
+//      Stripe la deja canceled sin crear ni cobrar una factura de renovación (#112).
+//      Requiere DATABASE_URL + psql. El API Server usa E2E_STRIPE_SECRET_KEY solo para este
+//      cliente desechable (@e2e.invalid); el resto de cancelaciones siguen con STRIPE_SECRET_KEY.
+//      Sin la clave se omite con aviso. Solo el lado de Stripe, sin panel:
+//      E2E_STRIPE_SECRET_KEY=sk_test_... pnpm --filter @workspace/api-server run e2e:stripe-test-clock
 import { chromium } from "playwright";
 import { nanoid } from "nanoid";
 import { execSync } from "node:child_process";
@@ -55,6 +60,18 @@ let stripeTestCustomerId = null;
 let stripeTestSubscriptionId = null;
 let stripeTestUserId = null;
 let stripeTestSubscriptionLinkedLocally = false;
+let stripeTestClockId = null;
+
+async function waitForTestClock(id, timeoutMs = 180000) {
+  const start = Date.now();
+  for (;;) {
+    const clock = await stripeTestRequest("GET", `test_helpers/test_clocks/${id}`);
+    if (clock.status === "ready") return clock;
+    if (clock.status === "internal_failure") throw new Error("El test clock de Stripe falló al avanzar");
+    if (Date.now() - start > timeoutMs) throw new Error(`El test clock no terminó de avanzar (estado ${clock.status})`);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
 
 async function stripeTestRequest(method, resource, values = {}) {
   const response = await fetch(`https://api.stripe.com/v1/${resource}`, {
@@ -310,13 +327,24 @@ try {
       const paid = await createClient("stripe-period-end");
       stripeTestUserId = paid.id;
 
+      const testClock = await stripeTestRequest("POST", "test_helpers/test_clocks", {
+        frozen_time: String(Math.floor(Date.now() / 1000)),
+        name: `E2E no-renewal ${paid.id}`.slice(0, 300),
+      });
+      stripeTestClockId = testClock.id;
+      ok(`Test clock de Stripe creado (${stripeTestClockId})`);
+
       const customer = await stripeTestRequest("POST", "customers", {
+        test_clock: stripeTestClockId,
         email: paid.email,
         name: paid.name,
         source: "tok_visa",
         "metadata[e2e_user_id]": paid.id,
       });
       stripeTestCustomerId = customer.id;
+
+      // price_data de una suscripción exige un producto existente (no admite product_data).
+      const testProduct = await stripeTestRequest("POST", "products", { name: `E2E period-end ${paid.id}` });
 
       const subscription = await stripeTestRequest("POST", "subscriptions", {
         customer: stripeTestCustomerId,
@@ -325,7 +353,7 @@ try {
         "items[0][price_data][currency]": "usd",
         "items[0][price_data][unit_amount]": "100",
         "items[0][price_data][recurring][interval]": "month",
-        "items[0][price_data][product_data][name]": `E2E period-end ${paid.id}`,
+        "items[0][price_data][product]": testProduct.id,
         "metadata[e2e_user_id]": paid.id,
       });
       stripeTestSubscriptionId = subscription.id;
@@ -415,6 +443,22 @@ try {
       const paidListedRow = page.locator(`[data-testid="delete-client-btn-${paid.id}"]`).locator("xpath=ancestor::tr");
       check(/Inactivo/.test(await paidListedRow.innerText()), "El cliente de Stripe aparece como Inactivo en la lista");
       await page.screenshot({ path: path.join(SHOTS, "09-stripe-period-end.png") });
+
+      // 7b. Avanzar el reloj de Stripe más allá del corte: no debe haber renovación.
+      if (Number.isInteger(remoteAfterCancel.cancel_at)) {
+        const target = remoteAfterCancel.cancel_at + 3600;
+        await stripeTestRequest("POST", `test_helpers/test_clocks/${stripeTestClockId}/advance`, { frozen_time: String(target) });
+        await waitForTestClock(stripeTestClockId);
+        ok(`Reloj de Stripe avanzado a ${new Date(target * 1000).toISOString()}`);
+        const ended = await stripeTestRequest("GET", `subscriptions/${stripeTestSubscriptionId}`);
+        check(ended.status === "canceled", `Stripe marca la suscripción canceled tras cancel_at (obtenido "${ended.status}")`);
+        const invoices = await stripeTestRequest("GET", `invoices?subscription=${stripeTestSubscriptionId}&limit=10`);
+        const renewals = (invoices.data || []).filter((i) => i.billing_reason === "subscription_cycle");
+        check((invoices.data || []).length === 1 && renewals.length === 0,
+          `Sin factura de renovación tras el corte (facturas=${(invoices.data || []).length}, de ciclo=${renewals.length})`);
+        const charges = await stripeTestRequest("GET", `charges?customer=${stripeTestCustomerId}&limit=10`);
+        check((charges.data || []).filter((c) => c.paid).length === 1, `Un único cobro en total (cobros=${(charges.data || []).length})`);
+      }
     }
   } else {
     console.warn("  ! E2E_STRIPE_SECRET_KEY no definido; se omite el escenario real de Stripe (solo se aceptan claves sk_test_)");
@@ -426,7 +470,9 @@ try {
   // la cancelación, se conserva la fila local para que la limpieza del usuario falle cerrada.
   if (TEST_STRIPE_SECRET && stripeTestSubscriptionId) {
     try {
-      const cancelled = await stripeTestRequest("DELETE", `subscriptions/${stripeTestSubscriptionId}`);
+      // Tras avanzar el test clock ya puede estar cancelada: solo se cancela si sigue viva.
+      const current = await stripeTestRequest("GET", `subscriptions/${stripeTestSubscriptionId}`);
+      const cancelled = current.status === "canceled" ? current : await stripeTestRequest("DELETE", `subscriptions/${stripeTestSubscriptionId}`);
       if (cancelled.status !== "canceled") throw new Error(`status=${cancelled.status}`);
       if (stripeTestSubscriptionLinkedLocally && stripeTestUserId && process.env.DATABASE_URL) {
         psql(`UPDATE subscriptions SET status = 'canceled', cancel_at_period_end = 0 WHERE user_id = '${stripeTestUserId}'`);
@@ -435,6 +481,14 @@ try {
     } catch (e) {
       console.warn(`  ! No se pudo confirmar la cancelación de limpieza de Stripe; se conserva la protección local: ${String(e.message || e)}`);
       failures.push("No se pudo confirmar la cancelación de la suscripción Stripe de test durante la limpieza");
+    }
+  }
+  if (TEST_STRIPE_SECRET && stripeTestClockId) {
+    // Borrar el reloj borra también su cliente y sus suscripciones de test.
+    try { await stripeTestRequest("DELETE", `test_helpers/test_clocks/${stripeTestClockId}`); stripeTestCustomerId = null; }
+    catch (e) {
+      console.warn(`  ! No se pudo borrar el test clock de Stripe: ${String(e.message || e)}`);
+      failures.push("No se pudo borrar el test clock de Stripe durante la limpieza");
     }
   }
   if (TEST_STRIPE_SECRET && stripeTestCustomerId) {

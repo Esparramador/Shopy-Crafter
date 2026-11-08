@@ -134,12 +134,28 @@ async function upsertSubscription(userId: string, values: Partial<typeof subscri
   }
 }
 
-/** Activa un plan de pago (alta o cambio) y lo aplica al proyecto. */
+/**
+ * Activa un plan de pago (alta o cambio) y lo aplica al proyecto. Es la activación ÚNICA:
+ * la usan el webhook (checkout.session.completed, por cualquiera de las dos URL) y la
+ * verificación al volver de Checkout (GET /billing/stripe/verify). Siempre guarda el id de
+ * cliente y de suscripción de Stripe: sin stripe_subscription_id el guard de borrado (409)
+ * no ve la facturación y el cliente se podría borrar mientras Stripe le sigue cobrando.
+ * Idempotente: si la misma suscripción ya está activa con este plan (el webhook y la vuelta
+ * de Checkout llegan los dos), no vuelve a poner a cero los contadores del proyecto.
+ */
 export async function activatePlan(userId: string, planId: string, opts: {
   interval: BillingInterval; periodEnd?: Date; customerId?: string | null; subscriptionId?: string | null;
-}): Promise<void> {
+}): Promise<{ alreadyActive: boolean }> {
   const cat = catalogPlan(planId);
   if (!cat) throw new Error(`Plan desconocido: ${planId}`);
+  if (opts.subscriptionId) {
+    const [current] = await db.select({
+      plan: subscriptionsTable.plan, status: subscriptionsTable.status, stripeSubscriptionId: subscriptionsTable.stripeSubscriptionId,
+    }).from(subscriptionsTable).where(eq(subscriptionsTable.userId, userId)).limit(1);
+    if (current?.stripeSubscriptionId === opts.subscriptionId && current.plan === planId && current.status === "active") {
+      return { alreadyActive: true };
+    }
+  }
   await upsertSubscription(userId, {
     plan: planId,
     status: "active",
@@ -153,6 +169,7 @@ export async function activatePlan(userId: string, planId: string, opts: {
   });
   await db.execute(sql`UPDATE subscriptions SET billing_interval = ${opts.interval}, updated_at = NOW() WHERE user_id = ${userId}`).catch(() => {});
   await syncProjectPlan(userId, planId);
+  return { alreadyActive: false };
 }
 
 interface CheckoutUrls { successUrl: string; cancelUrl: string }
@@ -384,8 +401,109 @@ async function onSubscriptionChanged(sub: Stripe.Subscription, deleted: boolean)
   }
 }
 
-/** Procesa un evento ya verificado con la firma del webhook. */
-export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
+// ─── Idempotencia: cada evento de Stripe se aplica una sola vez ─────────────
+//
+// Hay dos URL que reciben eventos de la plataforma (/api/billing/stripe/webhook y
+// /api/webhooks/stripe) y las dos acaban aquí. Si Stripe apunta a ambas, o reintenta,
+// el mismo evento (mismo event.id) llega varias veces: sin este registro un alta repetida
+// volvía a poner a cero los contadores mensuales del proyecto.
+//   processing → reclamado por una entrega en curso (caduca a los 5 min por si el proceso murió)
+//   done       → aplicado; las entregas siguientes se responden sin tocar nada
+//   failed     → falló; el siguiente reintento de Stripe lo vuelve a reclamar
+
+/** Tipos de evento de la plataforma que cambian datos; el resto se ignora sin registrar. */
+export const PLATFORM_STRIPE_EVENT_TYPES = new Set<string>([
+  "checkout.session.completed",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.expired",
+  "invoice.paid",
+  "invoice.payment_failed",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+]);
+
+let eventsTableReady: Promise<boolean> | null = null;
+function ensureProcessedEventsTable(): Promise<boolean> {
+  eventsTableReady ??= db.execute(sql`
+    CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+      event_id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'processing',
+      claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      processed_at TIMESTAMPTZ
+    )
+  `).then(() => true, err => {
+    eventsTableReady = null;
+    logger.warn({ err }, "stripe: no se pudo crear stripe_webhook_events; se procesa sin deduplicar");
+    return false;
+  });
+  return eventsTableReady;
+}
+
+/** true si esta entrega es la dueña del evento y debe aplicarlo. */
+async function claimEvent(event: Stripe.Event): Promise<boolean> {
+  if (!event.id || !(await ensureProcessedEventsTable())) return true;
+  const r = await db.execute(sql`
+    INSERT INTO stripe_webhook_events (event_id, type, status, claimed_at)
+    VALUES (${event.id}, ${event.type}, 'processing', NOW())
+    ON CONFLICT (event_id) DO UPDATE SET status = 'processing', claimed_at = NOW()
+      WHERE stripe_webhook_events.status = 'failed'
+         OR (stripe_webhook_events.status = 'processing' AND stripe_webhook_events.claimed_at < NOW() - INTERVAL '5 minutes')
+    RETURNING event_id
+  `);
+  return (r.rows ?? []).length > 0;
+}
+
+async function finishEvent(eventId: string, status: "done" | "failed"): Promise<void> {
+  await db.execute(sql`
+    UPDATE stripe_webhook_events SET status = ${status}, processed_at = ${status === "done" ? sql`NOW()` : null}
+    WHERE event_id = ${eventId}
+  `).catch(err => logger.warn({ err, eventId, status }, "stripe: no se pudo cerrar el registro del evento"));
+}
+
+/**
+ * Verifica la firma Stripe-Signature sobre el cuerpo ORIGINAL con cualquiera de los secretos
+ * conocidos (SDK oficial: HMAC + tolerancia de 5 min contra reenvíos). Misma verificación
+ * en las dos URL de webhook. Devuelve el evento o el motivo del rechazo.
+ */
+export function constructStripeWebhookEvent(
+  rawBody: Buffer | undefined, signature: string | undefined, secrets: string[],
+): { event: Stripe.Event } | { error: string } {
+  if (secrets.length === 0) return { error: "sin secreto de firma configurado" };
+  if (!rawBody || !signature) return { error: "falta la firma stripe-signature o el cuerpo original" };
+  let lastError = "firma inválida";
+  for (const secret of secrets) {
+    try { return { event: Stripe.webhooks.constructEvent(rawBody, signature, secret) }; }
+    catch (err) { lastError = err instanceof Error ? err.message : String(err); }
+  }
+  return { error: lastError };
+}
+
+export type StripeEventOutcome = "processed" | "duplicate" | "ignored";
+
+/**
+ * Procesa un evento de la PLATAFORMA ya verificado con la firma del webhook. Es la única
+ * puerta para los eventos de cobros: la usan /api/billing/stripe/webhook y /api/webhooks/stripe,
+ * así que una cancelación (o un alta, o un impago) se trata igual llegue por la URL que llegue.
+ * Idempotente por event.id. Si falla, lanza: el endpoint debe responder 5xx para que Stripe reintente.
+ */
+export async function handleStripeEvent(event: Stripe.Event): Promise<StripeEventOutcome> {
+  if (!PLATFORM_STRIPE_EVENT_TYPES.has(event.type)) return "ignored";
+  if (!(await claimEvent(event))) {
+    logger.info({ eventId: event.id, type: event.type }, "stripe: evento ya procesado (o en curso); se ignora la entrega repetida");
+    return "duplicate";
+  }
+  try {
+    await applyStripeEvent(event);
+  } catch (err) {
+    if (event.id) await finishEvent(event.id, "failed");
+    throw err;
+  }
+  if (event.id) await finishEvent(event.id, "done");
+  return "processed";
+}
+
+async function applyStripeEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded":
