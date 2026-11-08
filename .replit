@@ -44,7 +44,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/api-server && npx tsc --noEmit 2>&1 | tail -60"
+args = "bash -o pipefail -c 'pnpm --filter @workspace/api-server run typecheck 2>&1 | tail -60'"
 
 [workflows.workflow.metadata]
 isValidation = true
@@ -55,7 +55,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/shopify-optimizer && npx tsc --noEmit 2>&1 | tail -60"
+args = "bash -o pipefail -c 'pnpm --filter @workspace/shopify-optimizer run typecheck 2>&1 | tail -60'"
 
 [workflows.workflow.metadata]
 isValidation = true

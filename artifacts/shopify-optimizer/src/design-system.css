@@ -1216,6 +1216,9 @@ code {
    z-index > .modal-overlay; mientras haya un modal abierto (hook useModalLock
    pone data-modal-open en <body>) se ocultan para no tapar el modal. */
 body[data-modal-open] .floating-widget { visibility: hidden; pointer-events: none; }
+/* Igual mientras el chat del panel de cliente (ClientChatbot) está abierto: el
+   panel Setup arrastrable no debe quedar encima del chat (#95). */
+body[data-client-chat-open] .floating-widget { visibility: hidden; pointer-events: none; }
 
 .modal-box {
   background: var(--ink2); border: 1px solid var(--bdr2);

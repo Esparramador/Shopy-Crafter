@@ -49,6 +49,8 @@ export function ClientLayout({ children, padded = false }: { children: ReactNode
   const [unreadMessages, setUnreadMessages] = useState(0);
   const prevUnreadClientRef = useRef(-1);
   const [clientToast, setClientToast] = useState<string | null>(null);
+  // Con el chat abierto el aviso sube arriba para no tapar el panel del chat (#95).
+  const [clientChatOpen, setClientChatOpen] = useState(false);
   const clientToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const locationRef = useRef(location);
   useEffect(() => { locationRef.current = location; }, [location]);
@@ -397,14 +399,15 @@ export function ClientLayout({ children, padded = false }: { children: ReactNode
       </div>
 
       {/* Floating AI Chatbot del cliente — siempre visible (experto en su tienda) */}
-      <ClientChatbot />
+      <ClientChatbot onOpenChange={setClientChatOpen} />
 
       {/* In-app notification toast for client */}
       {clientToast && (
         <div
           onClick={() => { navigate("/client/messages"); setClientToast(null); }}
           style={{
-            position: "fixed", bottom: 28, right: 28, zIndex: 99999,
+            position: "fixed", right: 28, zIndex: 99999,
+            ...(clientChatOpen ? { top: 20 } : { bottom: 28 }),
             background: "linear-gradient(135deg, #1a6b4a 0%, #22c77e 100%)",
             color: "#fff",
             padding: "14px 20px", borderRadius: 14,

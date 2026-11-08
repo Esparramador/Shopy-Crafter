@@ -392,7 +392,8 @@ Devuelve ÚNICAMENTE JSON válido (sin markdown, sin backticks):
     if (engine === "grok") {
       const xaiKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
       if (!xaiKey) { res.status(500).json({ error: "XAI_API_KEY no configurada — ve a Secrets y verifica que existe la variable XAI_API_KEY con tu clave de api.x.ai" }); return; }
-      const grokModel = process.env.GROK_MODEL || "grok-3";
+      const { pickModel } = await import("../lib/ai-models.js");
+      const grokModel = await pickModel("xai", "genius"); // GROK_MODEL sigue valiendo (env heredada)
       engineUsed = grokModel;
       call = async ({ prompt, maxTokens }) => {
         const grokRes = await fetch("https://api.x.ai/v1/chat/completions", {

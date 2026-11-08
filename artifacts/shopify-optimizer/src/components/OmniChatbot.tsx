@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useSafeTimeout } from "@/hooks/useSafeTimeout";
 import { useDraggable } from "@/hooks/use-draggable";
 import { getModelShortName } from "@/lib/model-aliases";
+import { activeChatModel, copyText, type TierMatrixLite } from "@/lib/active-model";
 import VoiceCallModal from "@/components/VoiceCallModal";
 import { fetchBrainAction } from "@/lib/brain-action";
 
@@ -1374,6 +1375,20 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const [claudeModel, setClaudeModel] = useState<"claude-haiku-4-5" | "claude-sonnet-4-6" | "claude-opus-4-8">("claude-sonnet-4-6");
   const [gptModel, setGptModel] = useState<"gpt-4.1-nano" | "gpt-4.1-mini" | "gpt-4.1" | "gpt-4o">("gpt-4.1-mini");
   const [nvidiaModel, setNvidiaModel] = useState<string>("nvidia/llama-3.3-nemotron-super-49b-v1");
+  // Modelos por tier del backend (Gemini/Grok los decide el servidor): se leen al
+  // cambiar de motor para que el panel diga siempre qué modelo va a responder.
+  const [tierMatrix, setTierMatrix] = useState<TierMatrixLite | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  useEffect(() => {
+    if (engineMode !== "gemini" && engineMode !== "grok") return;
+    let cancelled = false;
+    fetch(`${API}/api/admin/ai-models`, { credentials: "include" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelled && d?.matrix) setTierMatrix(d.matrix); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [engineMode]);
+  const activeModel = activeChatModel(engineMode, { claudeModel, gptModel, nvidiaModel }, tierMatrix);
   const [slashPendingSkill, setSlashPendingSkill] = useState<SlashSkill | null>(null);
   const [slashPendingInput, setSlashPendingInput] = useState("");
   const [deepThinkMode, setDeepThinkMode] = useState(false);
@@ -2648,7 +2663,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       attachmentName: hasAttach ? attachName : undefined,
     };
     const thinkingId = uuid();
-    const engineLabels: Record<string, string> = { auto: "gemini+claude+brain", claude: claudeModel, gemini: "gemini+search", brain_only: "brain", grok: "grok-3", gpt: gptModel };
+    const engineLabels: Record<string, string> = { auto: "gemini+claude+brain", claude: claudeModel, gemini: "gemini+search", brain_only: "brain", grok: activeModel.id ?? "grok", gpt: gptModel };
     setMessages(m => [...m, userMsg, { id: thinkingId, role: "assistant" as const, content: "🧠 Analizando tu solicitud...", timestamp: new Date(), model: engineLabels[engineMode] || "gemini+claude+brain" }]);
     setInput(""); setAttachFile(null); setAttachFiles([]); setAttachUrl(""); setShowAttach(false);
     setLoading(true);
@@ -3481,7 +3496,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, claudeModel, gptModel, nvidiaModel, location]);
+  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, claudeModel, gptModel, nvidiaModel, location, activeModel.id]);
 
   // Prompt de un slash command que cambia de motor/modelo: se envía en el render
   // siguiente, cuando sendMessage ya ve el engineMode/nvidiaModel nuevos.
@@ -3769,10 +3784,19 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                             const bg = isGemini ? "rgba(45,212,159,0.10)" : isClaude ? "rgba(200,168,75,0.10)" : "rgba(255,255,255,0.05)";
                             const icon = isGemini ? "🔬" : isClaude ? "🧠" : "💡";
                             const shortName = getModelShortName(msg.model);
+                            const copied = copiedMsgId === msg.id;
+                            const modelId = msg.model;
                             return (
-                              <span title={msg.model} style={{ fontSize: 8, color, background: bg, border: `1px solid ${color}`, borderRadius: 4, padding: "1px 5px", fontWeight: 600, letterSpacing: "0.3px", whiteSpace: "nowrap", cursor: "help" }}>
-                                {icon} {shortName}
-                              </span>
+                              <button type="button" data-testid="model-badge"
+                                title={`${modelId} — clic para copiar`} aria-label={copied ? `ID ${modelId} copiado` : `Copiar ID del modelo ${modelId}`}
+                                onClick={async () => {
+                                  if (!(await copyText(modelId))) return;
+                                  setCopiedMsgId(msg.id);
+                                  window.setTimeout(() => setCopiedMsgId(id => (id === msg.id ? null : id)), 1500);
+                                }}
+                                style={{ fontSize: 8, color: copied ? "var(--jade)" : color, background: copied ? "rgba(45,212,159,0.12)" : bg, border: `1px solid ${copied ? "var(--jade)" : color}`, borderRadius: 4, padding: "1px 5px", fontWeight: 600, letterSpacing: "0.3px", whiteSpace: "nowrap", cursor: "copy", fontFamily: "inherit", lineHeight: "inherit", transition: "color 0.2s, background 0.2s, border-color 0.2s" }}>
+                                {copied ? "✓ ¡Copiado!" : `${icon} ${shortName}`}
+                              </button>
                             );
                           })()}
                         </div>
@@ -4236,6 +4260,11 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
                       🧩 {deepThinkMode ? "Think ON" : "Deep Think"}
                     </button>
                   )}
+                  {/* Modelo que va a responder con el motor elegido (se actualiza al cambiar de motor/sub-modelo) */}
+                  <div data-testid="active-model" aria-live="polite" title={activeModel.id ?? undefined}
+                    style={{ flexBasis: "100%", textAlign: "center", fontSize: 9, color: "var(--t4)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    Modelo activo: <code style={{ color: activeModel.id ? "var(--gold)" : "var(--t3)", fontFamily: "ui-monospace, monospace", fontSize: 9 }}>{activeModel.label}</code>
+                  </div>
                   {/* Sub-selector de modelo Claude — visible solo con motor Claude */}
                   {engineMode === "claude" && (
                     <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "center" }}>

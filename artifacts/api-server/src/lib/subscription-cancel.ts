@@ -58,16 +58,39 @@ function toSnapshot(s: Stripe.Subscription): StripeSubscriptionSnapshot {
   };
 }
 
-function defaultStripeClient(): StripeSubscriptionClient | null {
-  // The interactive E2E scenario creates a real test-mode subscription separately
-  // from the billing key. Never let that test key override the production client.
-  const e2eSecret = process.env.E2E_STRIPE_SECRET_KEY?.trim();
-  const useE2eSecret = process.env.NODE_ENV !== "production" && Boolean(e2eSecret);
-  if (useE2eSecret && !e2eSecret!.startsWith("sk_test_")) {
-    throw new Error("E2E_STRIPE_SECRET_KEY must be a Stripe test-mode secret key");
+/** Dominio reservado (RFC 2606) de los clientes desechables que crean los E2E del panel. */
+export const E2E_CLIENT_EMAIL_SUFFIX = "@e2e.invalid";
+
+export type StripeKeySelection =
+  | { source: "default"; key: string | null }
+  | { source: "e2e"; key: string }
+  | { source: "e2e_invalid"; key: null; error: string };
+
+/**
+ * Qué clave de Stripe usa la cancelación de UN cliente concreto.
+ *
+ * E2E_STRIPE_SECRET_KEY (cuenta de test) solo vale para la suscripción de prueba que crea el E2E:
+ * fuera de producción y únicamente para clientes desechables `@e2e.invalid`. Cualquier otra
+ * cancelación del admin usa STRIPE_SECRET_KEY: con la clave de test, Stripe respondería
+ * resource_missing para las suscripciones reales y la cancelación fallaría cerrada.
+ * En producción la clave E2E se ignora siempre.
+ */
+export function selectStripeKeyForCancellation(
+  userEmail: string | null | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): StripeKeySelection {
+  const defaultKey = env.STRIPE_SECRET_KEY?.trim() || null;
+  const e2eKey = env.E2E_STRIPE_SECRET_KEY?.trim();
+  const isE2eClient = String(userEmail ?? "").trim().toLowerCase().endsWith(E2E_CLIENT_EMAIL_SUFFIX);
+  if (!e2eKey || !isE2eClient || env.NODE_ENV === "production") return { source: "default", key: defaultKey };
+  if (!e2eKey.startsWith("sk_test_")) {
+    return { source: "e2e_invalid", key: null, error: "E2E_STRIPE_SECRET_KEY debe ser una clave de test (sk_test_); no se usa ninguna clave para este cliente de prueba" };
   }
-  const secret = useE2eSecret ? e2eSecret : process.env.STRIPE_SECRET_KEY;
-  if (!secret) return null;
+  return { source: "e2e", key: e2eKey };
+}
+
+/** Adaptador del SDK de Stripe al cliente mínimo de la cancelación. */
+export function stripeSubscriptionClientFromKey(secret: string): StripeSubscriptionClient {
   // Sin apiVersion explícita: se usa la versión que el SDK instalado tipa y soporta.
   const stripe = new Stripe(secret);
   return {
@@ -187,13 +210,14 @@ export interface CancelSubscriptionOptions {
 export async function cancelClientSubscription(
   targetId: string,
   actorId: string,
-  stripe: StripeSubscriptionClient | null = defaultStripeClient(),
+  /** undefined → se elige la clave según el cliente (selectStripeKeyForCancellation); null → Stripe sin configurar. */
+  stripeClient?: StripeSubscriptionClient | null,
   options: CancelSubscriptionOptions = {},
 ): Promise<CancelSubscriptionResult> {
   const mode: CancelMode = options.atPeriodEnd ? "period_end" : "now";
   if (targetId === actorId) return { ok: false, status: 400, error: "No puedes cancelar tu propia suscripción desde aquí" };
 
-  const [user] = await db.select({ id: usersTable.id, role: usersTable.role })
+  const [user] = await db.select({ id: usersTable.id, role: usersTable.role, email: usersTable.email })
     .from(usersTable).where(eq(usersTable.id, targetId)).limit(1);
   if (!user) return { ok: false, status: 404, error: "Usuario no encontrado" };
   if (user.role !== "client") return { ok: false, status: 403, error: "Solo se pueden cancelar suscripciones de usuarios de rol client" };
@@ -224,7 +248,23 @@ export async function cancelClientSubscription(
     };
   }
   const stripeSubscriptionId = sub!.stripeSubscriptionId!;
-  const stripeDashboardUrl = stripeSubscriptionDashboardUrl(stripeSubscriptionId);
+
+  let stripe: StripeSubscriptionClient | null;
+  let stripeDashboardUrl = stripeSubscriptionDashboardUrl(stripeSubscriptionId);
+  if (stripeClient !== undefined) {
+    stripe = stripeClient;
+  } else {
+    const selection = selectStripeKeyForCancellation(user.email);
+    if (selection.source === "e2e_invalid") {
+      logger.error({ targetId, stripeSubscriptionId }, selection.error);
+      return { ok: false, status: 503, stripeDashboardUrl, error: selection.error };
+    }
+    if (selection.source === "e2e") {
+      stripeDashboardUrl = stripeSubscriptionDashboardUrl(stripeSubscriptionId, selection.key);
+      logger.info({ targetId, stripeSubscriptionId }, "Cancelación de la suscripción de prueba E2E con E2E_STRIPE_SECRET_KEY");
+    }
+    stripe = selection.key ? stripeSubscriptionClientFromKey(selection.key) : null;
+  }
 
   if (!stripe) {
     return {

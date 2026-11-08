@@ -271,7 +271,7 @@ export default function VoiceCallModal({ onClose, API, mode = "admin" }: { onClo
       position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center",
       background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
     }} onClick={e => { if (e.target === e.currentTarget) { endCall(); onClose(); } }}>
-      <div style={{
+      <div data-testid="voice-call-card" style={{
         background: "var(--ink)", border: "1px solid var(--ink3)", borderRadius: 20, padding: "32px clamp(16px, 6vw, 32px)", width: "min(420px, 92vw)",
         // En móvil (375px) la tarjeta nunca supera la altura del viewport: si el
         // transcript + error crecen, se hace scroll dentro en vez de recortar los botones.
@@ -308,7 +308,7 @@ export default function VoiceCallModal({ onClose, API, mode = "admin" }: { onClo
 
         {/* Transcript */}
         {transcript.length > 0 && (
-          <div style={{
+          <div data-testid="voice-call-transcript" style={{
             width: "100%", maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6,
             background: "var(--ink2)", borderRadius: 10, padding: "10px 12px",
           }}>

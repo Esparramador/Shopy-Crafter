@@ -27,6 +27,7 @@ import { nanoid } from "nanoid";
 import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
+import { rectOf, inside, overlap } from "./lib/layout.mjs";
 
 const BASE = (process.env.E2E_BASE_URL || `https://${process.env.REPLIT_DEV_DOMAIN}`).replace(/\/$/, "");
 const EMAIL = process.env.E2E_ADMIN_EMAIL || "craftershopy@gmail.com";
@@ -71,13 +72,7 @@ function chromiumPath() {
   try { return execSync("which chromium", { encoding: "utf8" }).trim(); } catch { return undefined; }
 }
 
-const rectOf = (loc) => loc.evaluate((el) => {
-  const r = el.getBoundingClientRect();
-  return { x: r.x, y: r.y, w: r.width, h: r.height, right: r.right, bottom: r.bottom };
-});
-const inside = (inner, outer, tol = 0.5) =>
-  inner.x >= outer.x - tol && inner.y >= outer.y - tol && inner.right <= outer.right + tol && inner.bottom <= outer.bottom + tol;
-const overlap = (a, b) => a.x < b.right - 0.5 && b.x < a.right - 0.5 && a.y < b.bottom - 0.5 && b.y < a.bottom - 0.5;
+
 const fmt = (r) => `x=${r.x.toFixed(0)} y=${r.y.toFixed(0)} w=${r.w.toFixed(0)} h=${r.h.toFixed(0)}`;
 
 const browser = await chromium.launch({ executablePath: chromiumPath(), headless: true, args: ["--no-sandbox"] });
@@ -164,6 +159,30 @@ try {
       check(!t.clipped && t.lines === 1, `[${label}] título "${t.text}" legible en una línea (recortado=${t.clipped}, líneas=${t.lines})`);
       const titleRect = await rectOf(title);
       for (const { key, r } of rects) check(!overlap(titleRect, r), `[${label}] título no se solapa con "${key}"`);
+
+      // #95: ningún elemento position:fixed ajeno al chat (panel Setup, botón de
+      // voz, avisos…) puede quedar encima del panel abierto. Se excluye el cursor
+      // propio (.sc-cursor/.sc-cursor-ring): es el puntero del ratón, va donde esté
+      // el ratón y no recibe clics (pointer-events:none).
+      const intruders = await panel.evaluate((panelEl) => {
+        const pr = panelEl.getBoundingClientRect();
+        const out = [];
+        for (const el of document.querySelectorAll("body *")) {
+          if (panelEl.contains(el) || el.contains(panelEl)) continue;
+          if (el.closest(".sc-cursor, .sc-cursor-ring")) continue;
+          // Contenedor vacío de avisos (Toaster): sin avisos no pinta nada.
+          if (el.tagName === "OL" && el.children.length === 0) continue;
+          const cs = getComputedStyle(el);
+          if (cs.position !== "fixed" || cs.visibility === "hidden" || cs.display === "none" || parseFloat(cs.opacity) === 0) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 1 || r.height < 1) continue;
+          if (r.x < pr.right - 0.5 && pr.x < r.right - 0.5 && r.y < pr.bottom - 0.5 && pr.y < r.bottom - 0.5) {
+            out.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : ""} (${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}×${Math.round(r.height)})`);
+          }
+        }
+        return out;
+      });
+      check(intruders.length === 0, `[${label}] ningún elemento fijo ajeno al chat se solapa con el panel${intruders.length ? ": " + intruders.slice(0, 4).join(", ") : ""}`);
 
       const file = path.join(SHOTS, `chat-${vp.name}-${state}.png`);
       await page.screenshot({ path: file });

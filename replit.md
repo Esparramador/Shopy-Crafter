@@ -117,6 +117,10 @@ A complete pricing intelligence module at `/api/pricing/*` with 12 flat endpoint
 ### Supplier Intelligence
 The Suppliers page (`/projects/:id/suppliers`) features a premium dark luxury design with multi-source search, KPI cards, a comparison table, top suppliers ranking, and an AI Insight panel.
 
+## Checks and Tests
+- **Typecheck workflows** (`typecheck-api`, `typecheck-frontend` in `.replit`) run `bash -o pipefail -c 'pnpm --filter <pkg> run typecheck 2>&1 | tail -60'`: `pipefail` keeps TypeScript's exit code through `tail`, so a type error fails the check. Each package's `typecheck` script first runs `tsc -b` on the `lib/*` projects it references (their `dist/` is gitignored), so a missing build never shows up as TS6305 instead of real errors.
+- **Network guard for API tests**: `artifacts/api-server/src/test/network-guard.ts` (vitest `setupFiles`) blocks every outgoing socket and `fetch` that is not localhost/127.0.0.0/8/::1/`*.localhost`, so no test can reach a real store (Shopify, WooCommerce, Stripe) or provider (voice, AI). A blocked attempt fails the running test even if the code swallows the error. Use mocks or `app.listen(0)`; to allow a host explicitly, set `TEST_NET_ALLOW="host1,host2"`.
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **Anthropic Claude**: AI model.
