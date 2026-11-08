@@ -1202,7 +1202,15 @@ export async function generateVideoFromImage(
   model: VideoModel,
   imageBuffer: Buffer | null, imageMime: string,
   prompt: string,
-  opts: { duration?: number; aspect?: string; replicateToken?: string; cameraPreset?: string; negativePrompt?: string },
+  opts: {
+    duration?: number;
+    aspect?: string;
+    replicateToken?: string;
+    cameraPreset?: string;
+    negativePrompt?: string;
+    sceneIndex?: number;
+    onProviderTask?: (task: { provider: string; taskId: string; model: string; sceneIndex?: number }) => void | Promise<void>;
+  },
 ): Promise<Buffer> {
   const cfg = VIDEO_MODELS[model];
   if (!cfg) throw new Error(`Modelo de video desconocido: ${model}`);
@@ -1279,13 +1287,22 @@ export async function generateVideoFromImage(
         throw err;
       }
     }
+    const veoOperationName = typeof operation?.name === "string" ? operation.name : "";
+    if (veoOperationName) {
+      await opts.onProviderTask?.({
+        provider: "gemini",
+        taskId: veoOperationName,
+        model: veoModel,
+        sceneIndex: opts.sceneIndex,
+      });
+    }
 
-    const deadline = Date.now() + 6 * 60_000;
+    const deadline = Date.now() + 20 * 60_000;
     while (!operation.done && Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 10_000));
       operation = await ai.operations.getVideosOperation({ operation });
     }
-    if (!operation.done) throw new Error("Veo timed out (>6min)");
+    if (!operation.done) throw new Error("Veo timed out (>20min)");
     const generated = operation?.response?.generatedVideos?.[0];
     if (!generated?.video?.uri) throw new Error("Veo no devolvió video URI");
 
@@ -1344,8 +1361,14 @@ export async function generateVideoFromImage(
     });
     if (!createRes.ok) throw new Error(`Runway create failed: ${createRes.status} ${(await createRes.text()).slice(0, 200)}`);
     const { id: taskId } = await createRes.json() as { id: string };
+    await opts.onProviderTask?.({
+      provider: "runway",
+      taskId,
+      model: apiModel,
+      sceneIndex: opts.sceneIndex,
+    });
 
-    const deadline = Date.now() + 5 * 60_000;
+    const deadline = Date.now() + 20 * 60_000;
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 6_000));
       const sr = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
@@ -1356,7 +1379,7 @@ export async function generateVideoFromImage(
       if (st.status === "SUCCEEDED" && st.output?.[0]) return await fetchToBuffer(st.output[0]);
       if (st.status === "FAILED") throw new Error(`Runway failed: ${st.failure}`);
     }
-    throw new Error("Runway timed out");
+    throw new Error("Runway timed out (>20min)");
   }
 
   // ── xAI Grok Imagine Video (T2V + I2V) ───────────────────────────────────
@@ -1383,7 +1406,13 @@ export async function generateVideoFromImage(
     });
     if (!createRes.ok) throw new Error(`xAI video create failed: ${createRes.status} ${(await createRes.text()).slice(0, 300)}`);
     const { request_id } = await createRes.json() as { request_id: string };
-    const videoUrl = await pollXaiVideo(request_id, key);
+    await opts.onProviderTask?.({
+      provider: "xai",
+      taskId: request_id,
+      model: cfg.modelId!,
+      sceneIndex: opts.sceneIndex,
+    });
+    const videoUrl = await pollXaiVideo(request_id, key, 20 * 60_000);
     return await fetchToBuffer(videoUrl);
   }
 
@@ -1469,7 +1498,32 @@ export async function generateVideoFromImage(
     if (dataUri) input.image = dataUri;
   }
 
-  return await replicateRunBuffer(cfg.modelId, input, token);
+  const Replicate = (await import("replicate")).default;
+  const replicate = new Replicate({ auth: token });
+  const prediction = await replicate.predictions.create({ model: cfg.modelId, input });
+  await opts.onProviderTask?.({
+    provider: "replicate",
+    taskId: prediction.id,
+    model: cfg.modelId,
+    sceneIndex: opts.sceneIndex,
+  });
+  const deadline = Date.now() + 20 * 60_000;
+  let settled = prediction;
+  while (settled.status !== "succeeded" && settled.status !== "failed" && settled.status !== "canceled" && settled.status !== "aborted") {
+    if (Date.now() >= deadline) throw new Error("Replicate video timed out after 20 minutes");
+    await new Promise(resolve => setTimeout(resolve, 5_000));
+    settled = await replicate.predictions.get(prediction.id);
+  }
+  if (settled.status !== "succeeded") {
+    throw new Error(`Replicate video ${settled.status}: ${String(settled.error || "sin detalle").slice(0, 250)}`);
+  }
+  const rawOutput = Array.isArray(settled.output) ? settled.output[0] : settled.output;
+  const outputUrl = typeof rawOutput === "string" ? rawOutput
+    : rawOutput && typeof (rawOutput as any).url === "function" ? String((rawOutput as any).url())
+      : rawOutput && typeof (rawOutput as any).url === "string" ? String((rawOutput as any).url)
+        : "";
+  if (!outputUrl.startsWith("https://")) throw new Error("Replicate video returned no valid output URL");
+  return await fetchToBuffer(outputUrl);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

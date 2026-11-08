@@ -59,6 +59,19 @@ interface CharacterItem {
   refMimeType?: string | null;
 }
 
+interface RecoveredAdJob {
+  id: string;
+  kind: "smart-quick" | "smart-cinematic";
+  status: "running" | "completed" | "failed" | "interrupted";
+  stage: string;
+  message: string | null;
+  providerTasks: Array<{ provider: string; taskId: string; model?: string; sceneIndex?: number }>;
+  vaultId: number | null;
+  videoUrl: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+}
+
 interface AdProductInfo {
   images?: Array<{ src: string; alt?: string | null }>;
   price?: string | null;
@@ -129,12 +142,76 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
   const [progress, setProgress] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [result, setResult] = useState<AdVideoResponseResult | null>(null);
+  const [recoveryJob, setRecoveryJob] = useState<RecoveredAdJob | null>(null);
+  const [resultRecovered, setResultRecovered] = useState(false);
+  const requestInFlightRef = useRef(false);
+  const ignoredPriorJobIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const url = result?.url;
     if (!url?.startsWith("blob:")) return;
     return () => URL.revokeObjectURL(url);
   }, [result?.url]);
+
+  // Re-open the latest saved job after navigation, a lost HTTP response, or a
+  // page refresh. Polling reads only job state; it never starts another render.
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const response = await fetch(
+          `${API}/api/projects/${projectId}/products/${productId}/ads/jobs/latest`,
+          { credentials: "include" },
+        );
+        if (!response.ok) return;
+        const payload = await response.json() as { job?: RecoveredAdJob | null };
+        const job = payload.job;
+        if (!active || !job) return;
+        if (requestInFlightRef.current && job.id === ignoredPriorJobIdRef.current) return;
+        setRecoveryJob(job);
+        if (job.status === "completed" && job.vaultId && job.videoUrl) {
+          requestInFlightRef.current = false;
+          setResult({
+            savedToVault: true,
+            vaultId: job.vaultId,
+            url: job.videoUrl,
+            meta: job.result,
+          });
+          setResultRecovered(true);
+          setSubmitting(false);
+          setProgress("Anuncio recuperado del Vault.");
+          setError("");
+        } else if (job.status === "running") {
+          setSubmitting(true);
+          setProgress(job.message || "La generación continúa en el servidor.");
+          setError("");
+        } else if (job.status === "interrupted") {
+          requestInFlightRef.current = false;
+          setSubmitting(false);
+          setProgress("");
+          setError(
+            job.providerTasks.length
+              ? "El servidor se reinició durante la generación. Se guardaron los identificadores del proveedor; no vuelvas a generar este anuncio para evitar otro cargo."
+              : "El servidor se reinició durante la generación. Revisa el Vault antes de iniciar otra.",
+          );
+        } else if (job.status === "failed") {
+          requestInFlightRef.current = false;
+          setSubmitting(false);
+          setProgress("");
+          setError(job.message || "La generación anterior falló.");
+        }
+      } catch {
+        // The recovery list is best-effort while the API is temporarily unavailable.
+      }
+    };
+
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 4_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [projectId, productId]);
 
   // Character Lock
   const [characters, setCharacters] = useState<CharacterItem[]>([]);
@@ -323,9 +400,14 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
   }, [voices]);
 
   const submitQuickOrCinematic = async () => {
+    let waitingForBackgroundRecovery = false;
+    requestInFlightRef.current = true;
+    ignoredPriorJobIdRef.current = recoveryJob?.id ?? null;
     setSubmitting(true);
     setError("");
     setResult(null);
+    setRecoveryJob(null);
+    setResultRecovered(false);
     setProgress(tab === "quick" ? "Generando anuncio rápido..." : "Generando anuncio cinematográfico (esto puede tardar 2-5 min)...");
     try {
       const endpoint = tab === "quick"
@@ -360,10 +442,37 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
       setResult(parsed);
       setProgress(parsed.savedToVault ? "¡Listo!" : "");
     } catch (e: any) {
-      setError(e?.message || "Error generando anuncio");
+      // The browser can lose its response while the API keeps rendering.
+      // Read the durable job before suggesting any retry.
+      try {
+        const latest = await fetch(
+          `${API}/api/projects/${projectId}/products/${productId}/ads/jobs/latest`,
+          { credentials: "include" },
+        );
+        const payload = latest.ok ? await latest.json() : null;
+        const job = payload?.job as RecoveredAdJob | null | undefined;
+        if (job?.status === "running") {
+          setRecoveryJob(job);
+          waitingForBackgroundRecovery = true;
+          setSubmitting(true);
+          setProgress(job.message || "La generación continúa en el servidor.");
+          return;
+        }
+        if (job?.status === "completed" && job.vaultId && job.videoUrl) {
+          requestInFlightRef.current = false;
+          setRecoveryJob(job);
+          setResult({ savedToVault: true, vaultId: job.vaultId, url: job.videoUrl, meta: job.result });
+          setResultRecovered(true);
+          setSubmitting(false);
+          setProgress("Anuncio recuperado del Vault.");
+          return;
+        }
+      } catch { /* keep the original request error */ }
+      setError(e?.message || "Error generando anuncio. Comprueba el estado antes de volver a intentarlo.");
       setProgress("");
     } finally {
-      setSubmitting(false);
+      if (!waitingForBackgroundRecovery) setSubmitting(false);
+      if (!waitingForBackgroundRecovery) requestInFlightRef.current = false;
     }
   };
 
@@ -432,6 +541,8 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
     if (tab === "tryon") submitTryon();
     else submitQuickOrCinematic();
   };
+  const recoveryLocked =
+    recoveryJob?.status === "interrupted" && recoveryJob.providerTasks.length > 0;
 
   return (
     <ModalOverlay className="backdrop-blur-sm" onClick={onClose}>
@@ -928,7 +1039,7 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
               <div className="flex items-center justify-between">
                 <div className={`flex items-center gap-2 text-sm font-medium ${result.savedToVault ? "text-green-300" : "text-amber-200"}`}>
                   {result.savedToVault
-                    ? <><CheckCircle2 className="w-4 h-4" />Vídeo guardado en el Vault · #{result.vaultId}</>
+                    ? <><CheckCircle2 className="w-4 h-4" />{resultRecovered ? "Anuncio recuperado del Vault" : "Vídeo guardado en el Vault"} · #{result.vaultId}</>
                     : <><AlertCircle className="w-4 h-4" />Vídeo generado, pero no guardado en el Vault</>}
                 </div>
                 <div className="flex items-center gap-2 text-xs">
@@ -973,10 +1084,20 @@ export default function CreateAdModal({ projectId, productId, productTitle, prod
             </button>
             <button
               onClick={onSubmit}
-              disabled={submitting || Boolean(result && !result.savedToVault) || (tab === "tryon" && !modelFile && !characterId)}
+              disabled={submitting || recoveryLocked || Boolean(result && !result.savedToVault) || (tab === "tryon" && !modelFile && !characterId)}
               className="flex-[2] px-4 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              {submitting ? "Generando..." : tab === "tryon" ? "Generar Video Try-On" : tab === "cinematic" ? "Crear Anuncio Cinematográfico" : "Crear Anuncio Rápido"}
+              {submitting
+                ? "Generando..."
+                : recoveryLocked
+                  ? "Generación interrumpida"
+                  : resultRecovered && tab !== "tryon"
+                    ? "Crear otro anuncio"
+                    : tab === "tryon"
+                      ? "Generar Video Try-On"
+                      : tab === "cinematic"
+                        ? "Crear Anuncio Cinematográfico"
+                        : "Crear Anuncio Rápido"}
             </button>
           </div>
         </div>

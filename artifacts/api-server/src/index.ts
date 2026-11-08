@@ -390,6 +390,18 @@ const server = app.listen(port, (err?: Error) => {
   // Jobs masivos que estaban "running" murieron con el proceso anterior.
   import("./lib/bulk-queue.js").then(m => m.failStaleBulkJobs()).catch(err => logger.warn({ err }, "failStaleBulkJobs failed"));
 
+  // Recupera anuncios ya guardados en Vault antes de cerrar como interrumpidos
+  // los trabajos cuya petición estaba activa cuando el proceso se reinició.
+  import("./lib/product-ad-jobs.js")
+    .then(async (m) => {
+      const recovered = await m.recoverProductAdJobsFromVault();
+      const interrupted = await m.markRunningProductAdJobsInterrupted();
+      if (recovered || interrupted) {
+        logger.info({ recovered, interrupted }, "Product ad recovery sweep completed");
+      }
+    })
+    .catch((err) => logger.error({ err }, "Product ad recovery sweep failed"));
+
   db.execute(sql`
     CREATE TABLE IF NOT EXISTS rate_limits (
       key TEXT PRIMARY KEY,

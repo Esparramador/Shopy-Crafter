@@ -38,6 +38,12 @@ import { generateCinematicMultiShot, type CinematicAspect, type CinematicStyle }
 import { askClaudeJsonWithBrain } from "../lib/claude.js";
 import { loadCharacter, buildIdentityLockPrompt } from "../lib/character-loader.js";
 import { uploadRejected } from "../lib/upload-errors.js";
+import {
+  createProductAdJob,
+  getLatestProductAdJob,
+  getProductAdJob,
+  updateProductAdJob,
+} from "../lib/product-ad-jobs.js";
 
 const router = Router();
 
@@ -121,6 +127,50 @@ function clampDuration(d: any, def: number, max = 60): number {
   return Math.max(3, Math.min(max, Math.floor(n)));
 }
 
+router.get(
+  "/projects/:projectId/products/:productId/ads/jobs/latest",
+  requireAdmin,
+  async (req, res) => {
+    const projectId = Number.parseInt(String(req.params.projectId), 10);
+    const productId = String(req.params.productId);
+    if (!Number.isSafeInteger(projectId) || projectId <= 0) {
+      res.status(400).json({ error: "projectId no válido" });
+      return;
+    }
+    const { project, product } = await loadProjectAndProduct(projectId, productId);
+    if (!project || !product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+    const job = await getLatestProductAdJob(projectId, product.shopifyProductId);
+    res.json({ job });
+  },
+);
+
+router.get(
+  "/projects/:projectId/products/:productId/ads/jobs/:jobId",
+  requireAdmin,
+  async (req, res) => {
+    const projectId = Number.parseInt(String(req.params.projectId), 10);
+    const productId = String(req.params.productId);
+    if (!Number.isSafeInteger(projectId) || projectId <= 0) {
+      res.status(400).json({ error: "projectId no válido" });
+      return;
+    }
+    const { project, product } = await loadProjectAndProduct(projectId, productId);
+    if (!project || !product) {
+      res.status(404).json({ error: "Producto no encontrado" });
+      return;
+    }
+    const job = await getProductAdJob(String(req.params.jobId), projectId, product.shopifyProductId);
+    if (!job) {
+      res.status(404).json({ error: "Generación no encontrada" });
+      return;
+    }
+    res.json({ job });
+  },
+);
+
 // ════════════════════════════════════════════════════════════════════════════
 // 1) SMART QUICK AD  — AdStudio hero+voz+video, 1 variante (rápido, ~$0.30)
 // ════════════════════════════════════════════════════════════════════════════
@@ -129,6 +179,7 @@ router.post(
   requireAdmin,
   async (req, res) => {
     enableLongRunning(res);
+    let adJobId: string | null = null;
     try {
       const projectId = parseInt(String(req.params.projectId), 10);
       const productIdParam = String(req.params.productId);
@@ -229,7 +280,62 @@ router.post(
         ctaOverlayText: body.ctaText || undefined,
       };
 
-      const { variants, errors } = await runAdCampaign(input, replicateToken);
+      const previousJob = await getLatestProductAdJob(projectId, product.shopifyProductId);
+      if (
+        previousJob?.status === "running" ||
+        (previousJob?.status === "interrupted" && previousJob.providerTasks.length > 0)
+      ) {
+        res.status(409).json({
+          error: previousJob.status === "running"
+            ? "Ya hay un anuncio en curso para este producto. Puedes recuperar su estado en Auditoría."
+            : "El proveedor ya aceptó una generación interrumpida. Revisa el estado en Auditoría antes de iniciar otro anuncio.",
+          code: previousJob.status === "running" ? "AD_JOB_IN_PROGRESS" : "AD_JOB_INTERRUPTED",
+          jobId: previousJob.id,
+        });
+        return;
+      }
+      const createdAdJob = await createProductAdJob({
+        projectId,
+        productId: product.shopifyProductId,
+        kind: "smart-quick",
+      });
+      const adJob = createdAdJob.job;
+      if (!createdAdJob.created) {
+        res.status(409).json({
+          error: "Ya hay un anuncio en curso para este producto. Puedes recuperar su estado en Auditoría.",
+          code: "AD_JOB_IN_PROGRESS",
+          jobId: adJob.id,
+        });
+        return;
+      }
+      adJobId = adJob.id;
+      await updateProductAdJob(adJob.id, { stage: "copy", message: "Preparando el anuncio rápido…" });
+      const { variants, errors } = await runAdCampaign(
+        input,
+        replicateToken,
+        (event) => {
+          void updateProductAdJob(adJob.id, {
+            stage: event.stage,
+            message: event.message,
+          }).catch((error) => logger.warn({ error: (error as Error).message, jobId: adJob.id }, "ad job progress update failed"));
+        },
+        async (task) => {
+          try {
+            await updateProductAdJob(adJob.id, {
+              stage: "video",
+              message: "El proveedor está generando el vídeo.",
+              providerTask: {
+                provider: task.provider,
+                taskId: task.taskId,
+                model: task.model,
+                sceneIndex: task.variantIndex,
+              },
+            });
+          } catch (error) {
+            logger.error({ error: (error as Error).message, jobId: adJob.id, provider: task.provider, taskId: task.taskId }, "ad provider task id could not be persisted");
+          }
+        },
+      );
       const v0 = variants[0];
 
       // FIX: runAdCampaign only writes the MP4 to a local /tmp path
@@ -238,6 +344,12 @@ router.post(
       // permanently broken. We now persist the MP4 to the vault here and
       // expose a stable URL the frontend can play/download.
       if (!v0 || !v0.assets.finalMp4Path) {
+        await updateProductAdJob(adJob.id, {
+          status: "failed",
+          stage: "failed",
+          error: "AD_QUICK_FAILED",
+          message: "No se pudo generar el anuncio rápido.",
+        });
         res.status(503).json({
           error: `No se pudo generar el anuncio rápido con ${quickProvider.label}.`,
           code: "AD_QUICK_FAILED",
@@ -260,6 +372,7 @@ router.post(
           productTitle: product.title || undefined,
           generatedBy: `smart-quick:${input.videoProvider}`,
           metadata: {
+            adJobId: adJob.id,
             durationSec: durationSec,
             voiceId: finalVoiceId,
             voiceName: voice.voiceName,
@@ -276,6 +389,12 @@ router.post(
       }
 
       if (!finalMp4) {
+        await updateProductAdJob(adJob.id, {
+          status: "failed",
+          stage: "failed",
+          error: "AD_QUICK_OUTPUT_MISSING",
+          message: "El anuncio no produjo un archivo MP4 recuperable.",
+        });
         res.status(500).json({
           success: false,
           error: "El anuncio no produjo un archivo MP4 recuperable.",
@@ -288,6 +407,12 @@ router.post(
       await recordUsage(projectId, "image", quickCredits);
       if (!quickVideo) {
         logger.error({ projectId, productId: product.shopifyProductId }, "smart-quick: MP4 generado pero no quedó persistido en Vault");
+        await updateProductAdJob(adJob.id, {
+          status: "failed",
+          stage: "failed",
+          error: "AD_QUICK_VAULT_FAILED",
+          message: "El vídeo se generó, pero no se pudo confirmar su guardado en el Vault.",
+        });
         respondWithUnstoredAdVideo(
           req,
           res,
@@ -299,6 +424,22 @@ router.post(
       }
 
       v0.assets.finalMp4Url = quickVideo.downloadUrl;
+      const recoveredResult = {
+        success: true,
+        vaultId: quickVideo.vaultId,
+        videoUrl: quickVideo.downloadUrl,
+        productTitle: product.title,
+        language,
+      };
+      await updateProductAdJob(adJob.id, {
+        status: "completed",
+        stage: "completed",
+        message: "Anuncio guardado en el Vault.",
+        vaultId: quickVideo.vaultId,
+        videoUrl: quickVideo.downloadUrl,
+        result: recoveredResult,
+        error: null,
+      });
       learnFromOperation({
         operationType: "smart_quick_ad",
         title: `Anuncio rápido generado: ${product.title}`,
@@ -308,7 +449,8 @@ router.post(
       });
 
       res.json({
-        success: true,
+        ...recoveredResult,
+        jobId: adJob.id,
         vaultId: quickVideo.vaultId,
         videoUrl: quickVideo.downloadUrl,
         variant: v0,
@@ -319,6 +461,14 @@ router.post(
       });
     } catch (err: any) {
       logger.error({ err: err?.message, stack: err?.stack }, "smart-quick ad failed");
+      if (adJobId) {
+        void updateProductAdJob(adJobId, {
+          status: "failed",
+          stage: "failed",
+          message: "La generación del anuncio rápido falló.",
+          error: String(err?.code || err?.name || "AD_QUICK_ERROR").slice(0, 80),
+        }).catch((updateError) => logger.warn({ error: (updateError as Error).message, jobId: adJobId }, "ad job failure update failed"));
+      }
       if (!res.headersSent) {
         res.status(500).json({ error: err?.message || "Error generando anuncio", code: "AD_QUICK_ERROR" });
       }
@@ -334,6 +484,7 @@ router.post(
   requireAdmin,
   async (req, res) => {
     enableLongRunning(res);
+    let adJobId: string | null = null;
     try {
       const projectId = parseInt(String(req.params.projectId), 10);
       const productIdParam = String(req.params.productId);
@@ -462,6 +613,40 @@ router.post(
         compositionMode = "explainer-locked";
       }
 
+      const previousJob = await getLatestProductAdJob(projectId, product.shopifyProductId);
+      if (
+        previousJob?.status === "running" ||
+        (previousJob?.status === "interrupted" && previousJob.providerTasks.length > 0)
+      ) {
+        res.status(409).json({
+          error: previousJob.status === "running"
+            ? "Ya hay un anuncio en curso para este producto. Puedes recuperar su estado en Auditoría."
+            : "El proveedor ya aceptó una generación interrumpida. Revisa el estado en Auditoría antes de iniciar otro anuncio.",
+          code: previousJob.status === "running" ? "AD_JOB_IN_PROGRESS" : "AD_JOB_INTERRUPTED",
+          jobId: previousJob.id,
+        });
+        return;
+      }
+      const createdAdJob = await createProductAdJob({
+        projectId,
+        productId: product.shopifyProductId,
+        kind: "smart-cinematic",
+      });
+      const adJob = createdAdJob.job;
+      if (!createdAdJob.created) {
+        res.status(409).json({
+          error: "Ya hay un anuncio en curso para este producto. Puedes recuperar su estado en Auditoría.",
+          code: "AD_JOB_IN_PROGRESS",
+          jobId: adJob.id,
+        });
+        return;
+      }
+      adJobId = adJob.id;
+      await updateProductAdJob(adJob.id, {
+        stage: "script",
+        message: "Preparando el guion cinematográfico…",
+      });
+
       const result = await generateCinematicMultiShot({
         projectId,
         productImage,
@@ -513,6 +698,34 @@ router.post(
         // OR a brandKit and we auto-build a sensible 3-segment overlay.
         brandOverlay: (body as any).brandOverlay,
         brandKit: (body as any).brandKit,
+        onProgress: async (event) => {
+          try {
+            await updateProductAdJob(adJob.id, {
+              stage: event.stage,
+              message: event.message,
+            });
+          } catch (error) {
+            logger.warn({ error: (error as Error).message, jobId: adJob.id }, "ad job progress update failed");
+          }
+        },
+        onProviderTask: async (task) => {
+          try {
+            await updateProductAdJob(adJob.id, {
+              stage: "video",
+              message: task.sceneIndex
+                ? `El proveedor está generando la escena ${task.sceneIndex}.`
+                : "El proveedor está generando el vídeo.",
+              providerTask: {
+                provider: task.provider,
+                taskId: task.taskId,
+                model: task.model,
+                sceneIndex: task.sceneIndex,
+              },
+            });
+          } catch (error) {
+            logger.error({ error: (error as Error).message, jobId: adJob.id, provider: task.provider, taskId: task.taskId }, "ad provider task id could not be persisted");
+          }
+        },
       });
 
       // Persist final MP4 to vault — return URL instead of base64 to keep response small.
@@ -528,6 +741,7 @@ router.post(
           productTitle: product.title || undefined,
           generatedBy: `smart-cinematic:${body.videoModel || "kling-3.0-turbo"}`,
           metadata: {
+            adJobId: adJob.id,
             scenesCount: result.script.scenes.length,
             durationSec: result.durationSec,
             script: result.script,
@@ -546,6 +760,12 @@ router.post(
       await recordUsage(projectId, "image", cineCredits);
       if (!cineVideo) {
         logger.error({ projectId, productId: product.shopifyProductId }, "smart-cinematic: MP4 generado pero no quedó persistido en Vault");
+        await updateProductAdJob(adJob.id, {
+          status: "failed",
+          stage: "failed",
+          error: "AD_CINEMATIC_VAULT_FAILED",
+          message: "El vídeo se generó, pero no se pudo confirmar su guardado en el Vault.",
+        });
         respondWithUnstoredAdVideo(
           req,
           res,
@@ -566,7 +786,7 @@ router.post(
 
       const videoUrl = cineVideo.downloadUrl;
 
-      res.json({
+      const recoveredResult = {
         success: true,
         vaultId: cineVideo.vaultId,
         videoUrl,
@@ -588,9 +808,27 @@ router.post(
           : null,
         productTitle: product.title,
         language,
+      };
+      await updateProductAdJob(adJob.id, {
+        status: "completed",
+        stage: "completed",
+        message: "Anuncio guardado en el Vault.",
+        vaultId: cineVideo.vaultId,
+        videoUrl,
+        result: recoveredResult,
+        error: null,
       });
+      res.json({ ...recoveredResult, jobId: adJob.id });
     } catch (err: any) {
       logger.error({ err: err?.message, stack: err?.stack }, "smart-cinematic ad failed");
+      if (adJobId) {
+        void updateProductAdJob(adJobId, {
+          status: "failed",
+          stage: "failed",
+          message: "La generación cinematográfica falló.",
+          error: String(err?.code || err?.name || "AD_CINEMATIC_ERROR").slice(0, 80),
+        }).catch((updateError) => logger.warn({ error: (updateError as Error).message, jobId: adJobId }, "ad job failure update failed"));
+      }
       if (!res.headersSent) {
         res.status(500).json({ error: err?.message || "Error generando anuncio cinematográfico", code: "AD_CINEMATIC_ERROR" });
       }
