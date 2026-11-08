@@ -18,6 +18,12 @@
     "e2e:admin-modal-overlay": "node e2e/admin-modal-overlay.e2e.mjs",
     "e2e:convai-reset-selection": "node e2e/convai-reset-selection.e2e.mjs",
     "e2e:contacto-footer": "node e2e/contacto-footer.e2e.mjs",
+    "e2e:contacto-envio": "node e2e/contacto-envio.e2e.mjs",
+    "e2e:public-footers": "node e2e/public-footers.e2e.mjs",
+    "e2e:cabecera-movil": "node e2e/cabecera-movil.e2e.mjs",
+    "e2e:chat-boton-pie": "node e2e/chat-boton-pie.e2e.mjs",
+    "e2e:portada-halo": "node e2e/portada-halo-navegacion.e2e.mjs",
+    "e2e:portada-cursor-resize": "node e2e/portada-cursor-resize.e2e.mjs",
     "e2e:voice-tuning": "node e2e/convai-voice-tuning.e2e.mjs",
     "e2e:voice-apply-partial": "node e2e/convai-voice-apply-partial.e2e.mjs"
   },

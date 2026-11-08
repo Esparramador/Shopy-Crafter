@@ -5390,3 +5390,8 @@ html:not(.sc-cursor-on) a, html:not(.sc-cursor-on) button { cursor: pointer !imp
   /* El botón del chat flota abajo a la derecha: el pie deja ese hueco para que no tape el copyright ni los enlaces. */
   .fp-footer-standalone, .pp-footer, .shop-footer { padding-bottom: 96px !important; }
 }
+/* En escritorio el botón (56 px a 24 px del borde) también caía sobre el correo y los enlaces legales
+   de la última fila del pie: se deja el mismo hueco en las páginas que muestran el asistente. */
+@media (min-width: 901px) {
+  .fp-footer-standalone, .pp-footer { padding-bottom: 96px !important; }
+}
