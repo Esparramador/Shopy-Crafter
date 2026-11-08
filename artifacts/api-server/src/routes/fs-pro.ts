@@ -2159,7 +2159,8 @@ router.post("/fs-pro/extend-video", requireAdmin, async (req, res) => {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    const xaiModel = model === "grok-imagine-video-1.5-preview" ? "grok-imagine-video-1.5-preview" : "grok-imagine-video";
+    // ID oficial "grok-imagine-video-1.5"; "-preview" es un alias suyo (docs.x.ai) y se sigue aceptando.
+    const xaiModel = model === "grok-imagine-video-1.5" || model === "grok-imagine-video-1.5-preview" ? "grok-imagine-video-1.5" : "grok-imagine-video";
     const extDur = Math.min(Math.max(parseInt(duration || "6"), 2), 10);
 
     const buf = await extendXaiVideo(videoUrl, String(prompt).slice(0, 1500), extDur, xaiModel);
@@ -2206,7 +2207,8 @@ router.post("/fs-pro/edit-video", requireAdmin, async (req, res) => {
     const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
     if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
 
-    const xaiModel = model === "grok-imagine-video-1.5-preview" ? "grok-imagine-video-1.5-preview" : "grok-imagine-video";
+    // ID oficial "grok-imagine-video-1.5"; "-preview" es un alias suyo (docs.x.ai) y se sigue aceptando.
+    const xaiModel = model === "grok-imagine-video-1.5" || model === "grok-imagine-video-1.5-preview" ? "grok-imagine-video-1.5" : "grok-imagine-video";
 
     const buf = await editXaiVideo(videoUrl, String(prompt).slice(0, 1500), xaiModel);
 

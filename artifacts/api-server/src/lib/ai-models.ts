@@ -9,10 +9,10 @@
  *   4. Hard fallback (verified June-25-2026 via GET /v1beta/models + HTTP 200 test).
  *
  * Tiers:
- *   - "fast"   → cheap & quick      (Claude Haiku 4.5  / Gemini 3.5 Flash        / Grok 3 Mini Fast)
- *   - "smart"  → balanced default   (Claude Sonnet 4.6 / Gemini 3.1 Pro Preview  / Grok 3 Fast)
- *   - "genius" → max reasoning      (Claude Opus 4.8   / Gemini 3.1 Pro Preview  / Grok 3)
- *   - "vision" → multimodal-strong  (Claude Sonnet 4.6 / Gemini 2.5 Flash        / Grok 2 Vision)
+ *   - "fast"   → cheap & quick      (Claude Haiku 4.5  / Gemini 3.5 Flash        / Grok 4.3)
+ *   - "smart"  → balanced default   (Claude Sonnet 4.6 / Gemini 3.1 Pro Preview  / Grok 4.5)
+ *   - "genius" → max reasoning      (Claude Opus 4.8   / Gemini 3.1 Pro Preview  / Grok 4.5)
+ *   - "vision" → multimodal-strong  (Claude Sonnet 4.6 / Gemini 2.5 Flash        / Grok 4.3)
  *
  * Cached for 60s so live admin changes propagate quickly without DB hammering.
  */
@@ -41,10 +41,14 @@ const HARD_DEFAULTS: Record<AIProvider, Record<AITier, string>> = {
     vision: "gemini-2.5-flash",          // Reliable multimodal — confirmed available
   },
   xai: {
-    fast: "grok-3-mini-fast",
-    smart: "grok-3-fast",
-    genius: "grok-3",
-    vision: "grok-2-vision-1212",
+    // Verificado 07-11-2026 con la clave real: GET https://api.x.ai/v1/models → 200
+    // (13 modelos; ninguno grok-3* ni grok-2*). grok-4.3 admite imagen de entrada
+    // según docs.x.ai/docs/models/grok-4.3, así que cubre "vision"; de grok-4.5 la
+    // documentación no lo dice. Repetir la comprobación: GET /api/admin/ai-models/xai-live.
+    fast: "grok-4.3",
+    smart: "grok-4.5",
+    genius: "grok-4.5",
+    vision: "grok-4.3",
   },
 };
 
@@ -68,6 +72,21 @@ const ENV_KEYS: Record<AIProvider, Record<AITier, string>> = {
     vision: "XAI_MODEL_VISION",
   },
 };
+
+/** Variables de entorno antiguas que siguen valiendo como segunda opción.
+ *  GROK_MODEL era el modelo del motor Grok del chat admin (tier genius). */
+const LEGACY_ENV_KEYS: Partial<Record<AIProvider, Partial<Record<AITier, string>>>> = {
+  xai: { genius: "GROK_MODEL" },
+};
+
+function envModel(provider: AIProvider, tier: AITier): { value: string; key: string } | null {
+  for (const key of [ENV_KEYS[provider][tier], LEGACY_ENV_KEYS[provider]?.[tier]]) {
+    if (!key) continue;
+    const v = process.env[key];
+    if (v && v.trim().length > 0) return { value: v.trim(), key };
+  }
+  return null;
+}
 
 const SETTINGS_KEYS: Record<AIProvider, Record<AITier, string>> = {
   claude: {
@@ -185,6 +204,22 @@ const RETIRED_MODELS: Record<string, string> = {
   "gemini-2.0-flash-lite-001": "gemini-2.5-flash-lite",
   "gemini-1.5-flash": "gemini-2.5-flash",
   "gemini-1.5-pro": "gemini-2.5-pro",
+  // xAI, retirada del 15-05-2026 (docs.x.ai/developers/migration/may-15-retirement).
+  // La API los redirige y los cobra a tarifa de grok-4.3: mejor pedirlo explícito.
+  "grok-3": "grok-4.3",
+  "grok-4-0709": "grok-4.3",
+  "grok-4-fast-reasoning": "grok-4.3",
+  "grok-4-fast-non-reasoning": "grok-4.3",
+  "grok-4-1-fast-reasoning": "grok-4.3",
+  "grok-4-1-fast-non-reasoning": "grok-4.3",
+  "grok-code-fast-1": "grok-build-0.1",
+  // No aparecen en GET /v1/models (07-11-2026, con clave): equivalente real más cercano.
+  "grok-3-fast": "grok-4.5",
+  "grok-3-mini": "grok-4.3",
+  "grok-3-mini-fast": "grok-4.3",
+  "grok-2-1212": "grok-4.5",
+  "grok-2-vision-1212": "grok-4.3",
+  "grok-vision-beta": "grok-4.3",
 };
 const warnedRetired = new Set<string>();
 export function replaceRetiredModel(model: string): string {
@@ -208,9 +243,8 @@ export async function pickModel(provider: AIProvider, tier: AITier = "smart", ov
   const settings = await loadSettingsFromDb();
   const dbVal = settings.get(SETTINGS_KEYS[provider][tier]);
   if (dbVal) return replaceRetiredModel(dbVal);
-  const envKey = ENV_KEYS[provider][tier];
-  const envVal = process.env[envKey];
-  if (envVal && envVal.trim().length > 0) return replaceRetiredModel(envVal.trim());
+  const env = envModel(provider, tier);
+  if (env) return replaceRetiredModel(env.value);
   return HARD_DEFAULTS[provider][tier];
 }
 
@@ -220,9 +254,8 @@ export async function pickModel(provider: AIProvider, tier: AITier = "smart", ov
 export function pickModelSync(provider: AIProvider, tier: AITier = "smart"): string {
   const snapVal = snapshot.get(SETTINGS_KEYS[provider][tier]);
   if (snapVal) return replaceRetiredModel(snapVal);
-  const envKey = ENV_KEYS[provider][tier];
-  const envVal = process.env[envKey];
-  if (envVal && envVal.trim().length > 0) return replaceRetiredModel(envVal.trim());
+  const env = envModel(provider, tier);
+  if (env) return replaceRetiredModel(env.value);
   return HARD_DEFAULTS[provider][tier];
 }
 
@@ -239,13 +272,14 @@ export async function getAIModelMatrix(): Promise<AIModelMatrix> {
     const out = {} as Record<AITier, { current: string; default: string; envKey: string; settingsKey: string; source: "override" | "db" | "env" | "default" }>;
     for (const t of ["fast", "smart", "genius", "vision"] as AITier[]) {
       const settingsKey = SETTINGS_KEYS[provider][t];
-      const envKey = ENV_KEYS[provider][t];
       const dbVal = settings.get(settingsKey);
-      const envVal = process.env[envKey];
+      const env = envModel(provider, t);
+      const envKey = env?.key ?? ENV_KEYS[provider][t];
       let current: string;
       let source: "db" | "env" | "default";
-      if (dbVal) { current = dbVal; source = "db"; }
-      else if (envVal && envVal.trim().length > 0) { current = envVal.trim(); source = "env"; }
+      // `current` es lo que de verdad se envía: pasa por replaceRetiredModel igual que pickModel.
+      if (dbVal) { current = replaceRetiredModel(dbVal); source = "db"; }
+      else if (env) { current = replaceRetiredModel(env.value); source = "env"; }
       else { current = HARD_DEFAULTS[provider][t]; source = "default"; }
       out[t] = { current, default: HARD_DEFAULTS[provider][t], envKey, settingsKey, source };
     }
@@ -318,13 +352,18 @@ export const KNOWN_MODELS: Record<AIProvider, Array<{ id: string; label: string;
     { id: "gemini-flash-lite-latest",               label: "Gemini Flash Lite Latest (alias)",        tierHint: "fast",   notes: "🔄 Resuelve al flash-lite más reciente" },
     { id: "gemini-pro-latest",                      label: "Gemini Pro Latest (alias)",               tierHint: "smart",  notes: "🔄 Resuelve al pro más reciente" },
   ],
+  // ── xAI — VERIFICADO 07-11-2026 con la clave real (GET https://api.x.ai/v1/models → 200) ──
+  // Modelos de texto que devolvió la API; los de imagen/vídeo (grok-imagine-*) van en
+  // fusion-studio-pro.ts. grok-3*, grok-2* y grok-vision-beta ya no existen: ver RETIRED_MODELS.
+  // Repetir la comprobación: GET /api/admin/ai-models/xai-live.
   xai: [
-    { id: "grok-3", label: "Grok 3", tierHint: "genius", notes: "Flagship model June 2026, highest reasoning" },
-    { id: "grok-3-fast", label: "Grok 3 Fast", tierHint: "smart", notes: "Balanced Grok 3 performance" },
-    { id: "grok-3-mini", label: "Grok 3 Mini", tierHint: "fast", notes: "Lightweight Grok 3 for quick tasks" },
-    { id: "grok-3-mini-fast", label: "Grok 3 Mini Fast", tierHint: "fast", notes: "Fastest Grok 3 mini variant" },
-    { id: "grok-2-1212", label: "Grok 2", tierHint: "smart", notes: "Stable Grok 2 flagship" },
-    { id: "grok-2-vision-1212", label: "Grok 2 Vision", tierHint: "vision", notes: "Multimodal Grok 2 with vision support" },
-    { id: "grok-vision-beta", label: "Grok Vision Beta", tierHint: "vision", notes: "Experimental vision capabilities" },
+    { id: "grok-4.7", label: "Grok 4.7", tierHint: "genius", notes: "El más reciente (verificado con clave 07-11-2026)" },
+    { id: "grok-4.6", label: "Grok 4.6", tierHint: "genius", notes: "Verificado con clave 07-11-2026" },
+    { id: "grok-4.5", label: "Grok 4.5", tierHint: "smart", notes: "Default smart/genius (verificado con clave 07-11-2026)" },
+    { id: "grok-4.3", label: "Grok 4.3", tierHint: "fast", notes: "Texto + imagen, 1M de contexto; default fast/vision (verificado con clave 07-11-2026)" },
+    { id: "grok-4.20-0309-reasoning", label: "Grok 4.20 Reasoning", tierHint: "genius", notes: "Verificado con clave 07-11-2026" },
+    { id: "grok-4.20-0309-non-reasoning", label: "Grok 4.20 (sin razonamiento)", tierHint: "fast", notes: "Verificado con clave 07-11-2026" },
+    { id: "grok-4.20-multi-agent-0309", label: "Grok 4.20 Multi-Agent", tierHint: "genius", notes: "Verificado con clave 07-11-2026" },
+    { id: "grok-build-0.1", label: "Grok Build 0.1", tierHint: "smart", notes: "Programación; sucesor de grok-code-fast-1 (verificado con clave 07-11-2026)" },
   ],
 };

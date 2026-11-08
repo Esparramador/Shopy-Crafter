@@ -6,6 +6,7 @@ import {
   ExternalLink, ArrowRight, BarChart3, Clock,
   Layers, Cpu, DollarSign, Target, Award
 } from "lucide-react";
+import AIModelTiersPanel from "@/components/AIModelTiersPanel";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -262,6 +263,8 @@ export default function AICatalog() {
           <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 4 }}>Sync automático activo</div>
         </Card>
       </div>
+
+      <AIModelTiersPanel />
 
       {/* Main Content Tabs (Simulated) */}
       <div style={{ display: "flex", gap: 24, marginBottom: 24 }}>

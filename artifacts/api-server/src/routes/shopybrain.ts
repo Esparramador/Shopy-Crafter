@@ -1369,7 +1369,9 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
         // Grok (xAI): razonamiento rápido, análisis en tiempo real, perspectiva alternativa
         const xaiKey = process.env.XAI_API_KEY ?? process.env.GROK_API_KEY;
         if (!xaiKey) throw new Error("XAI_API_KEY no configurada — contacta al administrador");
-        const grokModel = process.env.GROK_MODEL || "grok-3";
+        // Tier genius de xAI: override del panel (Catálogo IA) → XAI_MODEL_GENIUS/GROK_MODEL → grok-4.3.
+        const { pickModel } = await import("../lib/ai-models.js");
+        const grokModel = await pickModel("xai", "genius");
         const grokRes = await fetch("https://api.x.ai/v1/chat/completions", {
           method: "POST",
           headers: { "Authorization": `Bearer ${xaiKey}`, "Content-Type": "application/json" },

@@ -160,6 +160,30 @@ try {
       const titleRect = await rectOf(title);
       for (const { key, r } of rects) check(!overlap(titleRect, r), `[${label}] título no se solapa con "${key}"`);
 
+      // #95: ningún elemento position:fixed ajeno al chat (panel Setup, botón de
+      // voz, avisos…) puede quedar encima del panel abierto. Se excluye el cursor
+      // propio (.sc-cursor/.sc-cursor-ring): es el puntero del ratón, va donde esté
+      // el ratón y no recibe clics (pointer-events:none).
+      const intruders = await panel.evaluate((panelEl) => {
+        const pr = panelEl.getBoundingClientRect();
+        const out = [];
+        for (const el of document.querySelectorAll("body *")) {
+          if (panelEl.contains(el) || el.contains(panelEl)) continue;
+          if (el.closest(".sc-cursor, .sc-cursor-ring")) continue;
+          // Contenedor vacío de avisos (Toaster): sin avisos no pinta nada.
+          if (el.tagName === "OL" && el.children.length === 0) continue;
+          const cs = getComputedStyle(el);
+          if (cs.position !== "fixed" || cs.visibility === "hidden" || cs.display === "none" || parseFloat(cs.opacity) === 0) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 1 || r.height < 1) continue;
+          if (r.x < pr.right - 0.5 && pr.x < r.right - 0.5 && r.y < pr.bottom - 0.5 && pr.y < r.bottom - 0.5) {
+            out.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.split(" ")[0] : ""} (${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}×${Math.round(r.height)})`);
+          }
+        }
+        return out;
+      });
+      check(intruders.length === 0, `[${label}] ningún elemento fijo ajeno al chat se solapa con el panel${intruders.length ? ": " + intruders.slice(0, 4).join(", ") : ""}`);
+
       const file = path.join(SHOTS, `chat-${vp.name}-${state}.png`);
       await page.screenshot({ path: file });
       console.log(`  captura → ${file}`);

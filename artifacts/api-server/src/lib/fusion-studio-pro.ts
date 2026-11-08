@@ -213,6 +213,10 @@ export const IMAGE_MODELS: Record<ImageGenModel, { provider: ImageProvider; repl
   "flux-kontext-dev":       { provider: "replicate", replicateId: "black-forest-labs/flux-kontext-dev",   description: "Flux Kontext Dev — open-weights, edición artística creativa", costPerImage: 0.03, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "1440x1440" },
   "recraft-v4":             { provider: "replicate", replicateId: "recraft-ai/recraft-v4",                description: "Recraft V4 — última generación, texto nítido + realismo máximo", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
   "ideogram-v3-quality":    { provider: "replicate", replicateId: "ideogram-ai/ideogram-v3-quality",      description: "Ideogram V3 Quality — máxima calidad texto en imagen + photoreal", costPerImage: 0.06, aspectRatios: ["1:1","16:9","9:16","4:3","3:4"], maxResolution: "2048x2048" },
+  // PENDIENTE DE PROBAR CON CLAVE (07-11-2026): no hay fuente oficial de "Imagen 5". La página
+  // de Google (aistudio.google.com/docs/imagen) dice que Imagen está apagado en la API de Gemini
+  // y remite a Nano Banana; replicate.com/google no lista ningún google/imagen-* (también
+  // google/imagen-4 da 404). Comprobar con REPLICATE_API_TOKEN: GET /v1/models/google/imagen-5.
   "imagen-5-ultra":         { provider: "replicate", replicateId: "google/imagen-5-ultra",               description: "Google Imagen 5 Ultra — máxima calidad 2026, coherencia semántica avanzada", costPerImage: 0.08, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2048x2048" },
   "imagen-5":               { provider: "replicate", replicateId: "google/imagen-5",                     description: "Google Imagen 5 — estándar 2026, supera al Imagen 4 en detalle", costPerImage: 0.05, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "2048x2048" },
   "stable-diffusion-3.5-large": { provider: "replicate", replicateId: "stability-ai/stable-diffusion-3.5-large", description: "Stability AI SD 3.5 Large — photoreal artístico, mejor SD a la fecha", costPerImage: 0.035, aspectRatios: ["1:1","16:9","9:16","4:3","3:4","21:9"], maxResolution: "1024x1024" },
@@ -1052,7 +1056,9 @@ export const VIDEO_MODELS: Record<VideoModel, { provider: "runway" | "replicate"
   "wan-2.7":             { provider: "replicate", modelId: "wan-video/wan-2.7-i2v",           description: "Wan 2.7 — última gen open-source wan-video, T2V+I2V+R2V, hasta 1080p y 15s",  costPerSec: 0.05,  quality: 8,  maxDuration: 15 },
   "hailuo-2.3":          { provider: "replicate", modelId: "minimax/hailuo-2.3",              description: "MiniMax Hailuo 2.3 — 1080p en 6 s / 768p en 10 s, T2V+I2V (0,49 $ / 0,56 $ por clip)", costPerSec: 0.082, quality: 8, maxDuration: 10 },
   "hailuo-2.3-fast":     { provider: "replicate", modelId: "minimax/hailuo-2.3-fast",         description: "MiniMax Hailuo 2.3 Fast — solo imagen→vídeo, 1080p en 6 s (0,33 $ / 0,32 $ por clip)", costPerSec: 0.055, quality: 7, maxDuration: 10 },
-  "grok-video-1":        { provider: "xai", modelId: "grok-video-1",           description: "xAI Grok Video 1 — June 2026 flagship video, T2V/I2V, cinematic quality", costPerSec: 0.15, quality: 10, maxDuration: 15 },
+  // "grok-video-1" no existe en xAI (docs.x.ai/docs/models, 07-11-2026: solo grok-imagine-video,
+  // -1.5 y -1.5-lite). Se conserva la clave del catálogo y se envía el mejor modelo real.
+  "grok-video-1":        { provider: "xai", modelId: "grok-imagine-video-1.5", description: "xAI Grok Imagine Video 1.5 — máxima calidad de xAI, T2V/I2V", costPerSec: 0.15, quality: 10, maxDuration: 15 },
   "grok-imagine-video":    { provider: "xai", modelId: "grok-imagine-video",           description: "xAI Grok Imagine Video — T2V/I2V, hasta 15s, 720p ($0.07/s)", costPerSec: 0.07, quality: 9,  maxDuration: 15 },
   "grok-imagine-video-1.5":{ provider: "xai", modelId: "grok-imagine-video-1.5",         description: "xAI Grok Imagine Video 1.5 — I2V 1080p, máxima calidad xAI ($0.14/s)", costPerSec: 0.14, quality: 10, maxDuration: 15 },
   "veo-3.1-lite":          { provider: "gemini",    modelId: "veo-3.1-lite-generate-preview",  description: "Google Veo 3.1 Lite — tier más económico, audio nativo (jul 2026)",        costPerSec: 0.15, quality: 7,  maxDuration: 8  },
@@ -1314,7 +1320,9 @@ export async function generateVideoFromImage(
     const ratio = ratioMap[opts.aspect || "9:16"] || (isGen3 ? "768:1280" : "720:1280");
     const runwayModel = isGen3 ? "gen3a_turbo"
       : model === "runway-gen4.5" ? "gen4.5"
-      : model === "runway-gen4.5-turbo" ? "gen4_5_turbo"
+      // "gen4_5_turbo" no existe en la API: la lista oficial de modelos
+      // (docs.dev.runwayml.com/guides/models, 07-11-2026) solo tiene "gen4.5".
+      : model === "runway-gen4.5-turbo" ? "gen4.5"
       : model === "runway-seedance2" ? "seedance2"
       : model === "runway-seedance2-fast" ? "seedance2_fast"
       : model === "runway-gen5" ? "gen4.5"
@@ -1476,7 +1484,7 @@ export async function extendXaiVideo(
   videoUrl: string,
   prompt: string,
   extensionDurationSec = 6,
-  model: "grok-imagine-video" | "grok-imagine-video-1.5-preview" = "grok-imagine-video",
+  model: "grok-imagine-video" | "grok-imagine-video-1.5" = "grok-imagine-video",
 ): Promise<Buffer> {
   const key = getXaiKey();
   const dur = Math.min(Math.max(extensionDurationSec, 2), 10);
@@ -1502,7 +1510,7 @@ export async function extendXaiVideo(
 export async function editXaiVideo(
   videoUrl: string,
   prompt: string,
-  model: "grok-imagine-video" | "grok-imagine-video-1.5-preview" = "grok-imagine-video",
+  model: "grok-imagine-video" | "grok-imagine-video-1.5" = "grok-imagine-video",
 ): Promise<Buffer> {
   const key = getXaiKey();
   const createRes = await fetch("https://api.x.ai/v1/videos/edits", {
