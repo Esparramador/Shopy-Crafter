@@ -542,7 +542,24 @@ export async function fitPhotoToAspect(photo: Buffer, aspect: AdAspect): Promise
 
 // ─── STEP 3: VIDEO (registro verificado: Runway / Kling / Hailuo) ──────────
 
-async function generateVideoRunway(p: AdVideoProvider, input: AdCampaignInput, prompt: string, imageBuffer: Buffer, imageMime: string): Promise<Buffer> {
+export interface AdProviderTaskEvent {
+  provider: string;
+  taskId: string;
+  model: string;
+  variantIndex?: number;
+}
+
+type OnAdProviderTask = (event: AdProviderTaskEvent) => void | Promise<void>;
+
+async function generateVideoRunway(
+  p: AdVideoProvider,
+  input: AdCampaignInput,
+  prompt: string,
+  imageBuffer: Buffer,
+  imageMime: string,
+  onProviderTask?: OnAdProviderTask,
+  variantIndex?: number,
+): Promise<Buffer> {
   const apiKey = getRunwayKey();
   const dataUri = `data:${imageMime};base64,${imageBuffer.toString("base64")}`;
   const createRes = await fetch(`${RUNWAY_BASE}/image_to_video`, {
@@ -565,8 +582,9 @@ async function generateVideoRunway(p: AdVideoProvider, input: AdCampaignInput, p
     throw new Error(`Runway create failed: ${createRes.status} ${err.slice(0, 300)}`);
   }
   const { id: taskId } = await createRes.json() as { id: string };
+  await onProviderTask?.({ provider: "runway", taskId, model: p.modelId, variantIndex });
 
-  const deadline = Date.now() + 6 * 60_000;
+  const deadline = Date.now() + 20 * 60_000;
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 6_000));
     const statusRes = await fetch(`${RUNWAY_BASE}/tasks/${taskId}`, {
@@ -579,10 +597,19 @@ async function generateVideoRunway(p: AdVideoProvider, input: AdCampaignInput, p
       throw new Error(`Runway task failed: ${status.failure || status.status}`);
     }
   }
-  throw new Error("Runway timed out after 6 minutes");
+  throw new Error("Runway timed out after 20 minutes");
 }
 
-async function generateVideoReplicate(p: AdVideoProvider, input: AdCampaignInput, prompt: string, imageBuffer: Buffer, imageMime: string, replicateToken: string): Promise<Buffer> {
+async function generateVideoReplicate(
+  p: AdVideoProvider,
+  input: AdCampaignInput,
+  prompt: string,
+  imageBuffer: Buffer,
+  imageMime: string,
+  replicateToken: string,
+  onProviderTask?: OnAdProviderTask,
+  variantIndex?: number,
+): Promise<Buffer> {
   const Replicate = (await import("replicate")).default;
   const rep = new Replicate({ auth: replicateToken });
   const params = replicateInput(p, {
@@ -592,8 +619,27 @@ async function generateVideoReplicate(p: AdVideoProvider, input: AdCampaignInput
     requestedSec: input.videoDurationSec,
     aspect: input.aspect,
   });
-  const output = await rep.run(p.modelId as `${string}/${string}`, { input: params });
-  const raw = Array.isArray(output) ? output[0] : output;
+  const prediction = await rep.predictions.create({
+    model: p.modelId,
+    input: params,
+  });
+  await onProviderTask?.({
+    provider: "replicate",
+    taskId: prediction.id,
+    model: p.modelId,
+    variantIndex,
+  });
+  const deadline = Date.now() + 20 * 60_000;
+  let settled = prediction;
+  while (settled.status !== "succeeded" && settled.status !== "failed" && settled.status !== "canceled" && settled.status !== "aborted") {
+    if (Date.now() >= deadline) throw new Error("Replicate video timed out after 20 minutes");
+    await new Promise(resolve => setTimeout(resolve, 5_000));
+    settled = await rep.predictions.get(prediction.id);
+  }
+  if (settled.status !== "succeeded") {
+    throw new Error(`Replicate video ${settled.status}: ${String(settled.error || "sin detalle").slice(0, 250)}`);
+  }
+  const raw = Array.isArray(settled.output) ? settled.output[0] : settled.output;
   let videoUrl: string;
   if (typeof raw === "string") {
     videoUrl = raw;
@@ -614,6 +660,8 @@ export async function generateVideo(
   imageBuffer: Buffer,
   imageMime: string,
   projectReplicateToken?: string,
+  onProviderTask?: OnAdProviderTask,
+  variantIndex?: number,
 ): Promise<Buffer> {
   const p = providerOrThrow(input.videoProvider);
   const { getTemplate } = await import("./ad-templates.js");
@@ -622,9 +670,11 @@ export async function generateVideo(
   const camera = tpl ? CAMERA_PRESETS[tpl.cameraPreset] : null;
   // Prompt solo visual: nunca marca, producto ni CTA (el modelo los escribiría mal).
   const prompt = buildVisualVideoPrompt(input, copy, camera ? ` ${camera.promptPrefix}` : "");
-  if (p.vendor === "runway") return await generateVideoRunway(p, input, prompt, imageBuffer, imageMime);
+  if (p.vendor === "runway") {
+    return await generateVideoRunway(p, input, prompt, imageBuffer, imageMime, onProviderTask, variantIndex);
+  }
   if (!projectReplicateToken) throw new Error("REPLICATE_API_TOKEN requerido para este proveedor de vídeo");
-  return await generateVideoReplicate(p, input, prompt, imageBuffer, imageMime, projectReplicateToken);
+  return await generateVideoReplicate(p, input, prompt, imageBuffer, imageMime, projectReplicateToken, onProviderTask, variantIndex);
 }
 
 /** Recorta al centro el vídeo si el modelo no genera el formato pedido (p. ej. 4:5). */
@@ -1066,6 +1116,7 @@ export async function runAdCampaign(
   input: AdCampaignInput,
   projectReplicateToken: string | undefined,
   onProgress?: (event: { stage: string; variantIndex?: number; message: string }) => void,
+  onProviderTask?: OnAdProviderTask,
 ): Promise<{ variants: Array<{ copy: AdCopyVariant; assets: AdAssetPaths }>; errors: string[] }> {
   const errors: string[] = [];
   const variants: Array<{ copy: AdCopyVariant; assets: AdAssetPaths }> = [];
@@ -1113,7 +1164,7 @@ export async function runAdCampaign(
 
       // STEP 3: Video
       onProgress?.({ stage: "video", variantIndex: i, message: `[${i + 1}/${copies.length}] Generando vídeo con ${provider.label} (${effectiveDuration(provider, input.videoDurationSec)} s, 1-4 min)...` });
-      let videoBuf = await generateVideo(input, copy, imgBuf, imgMime, projectReplicateToken);
+      let videoBuf = await generateVideo(input, copy, imgBuf, imgMime, projectReplicateToken, onProviderTask, i);
       if (genAspect !== input.aspect) {
         onProgress?.({ stage: "video", variantIndex: i, message: `[${i + 1}/${copies.length}] Ajustando a formato ${input.aspect}...` });
         videoBuf = await cropVideoToAspect(videoBuf, input.aspect);

@@ -158,6 +158,8 @@ export interface CinematicMultiShotRequest {
     /** Hex accent color for the CTA layer. */
     accentHex?: string;
   };
+  onProgress?: (event: { stage: string; sceneIndex?: number; message: string }) => void | Promise<void>;
+  onProviderTask?: (task: { provider: string; taskId: string; model: string; sceneIndex?: number }) => void | Promise<void>;
 }
 
 export interface CinematicMultiShotResult {
@@ -731,6 +733,7 @@ export async function generateCinematicMultiShot(
     script = await generateCinematicScript(req, scenesCount, sceneDurations);
   }
   logger.info({ scenes: script.scenes.length, title: script.title, loadedFromTemplate, longForm: Boolean(req.longForm), composition: req.compositionMode }, "🎬 CinematicMultiShot: script ready");
+  await req.onProgress?.({ stage: "keyframes", message: "Guion listo; generando fotogramas de las escenas…" });
 
   // ── 2. Per-scene keyframes (PARALLEL with concurrency limit) ────────────
   // Si hay Character Lock, antepondemos el bloque de identidad al prompt y pasamos
@@ -828,11 +831,14 @@ export async function generateCinematicMultiShot(
           duration: dur,
           aspect: req.aspect,
           cameraPreset: "static_lockoff",
+          sceneIndex: scene.idx,
+          onProviderTask: req.onProviderTask,
         }),
         2,
         `video scene ${scene.idx} (locked-shot)`,
       );
       clips.push({ idx: scene.idx, buffer: buf, mime: "video/mp4", durationSec: dur });
+      await req.onProgress?.({ stage: "video", sceneIndex: scene.idx, message: `Escena ${scene.idx}/${script.scenes.length} lista.` });
       logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur }, "🎬 locked-shot: clip generated");
 
       // 3) Extract last frame for the next iteration.
@@ -896,6 +902,7 @@ export async function generateCinematicMultiShot(
     // Para 30 escenas: ~9 min wall-clock vs ~45 min secuencial.
     // Provider rate-limits: kling permite ~5-10 paralelos; runway 3; veo 5.
     const VIDEO_CONCURRENCY = req.videoModel.startsWith("runway") ? 3 : 5;
+    await req.onProgress?.({ stage: "video", message: "Fotogramas listos; generando clips de vídeo…" });
     clips = await runWithConcurrency(
       script.scenes.map((scene, i) => async () => {
         const dur = sceneDurations[i];
@@ -906,10 +913,13 @@ export async function generateCinematicMultiShot(
             duration: dur,
             aspect: req.aspect,
             cameraPreset: scene.cameraPreset || cameraPreset,
+          sceneIndex: scene.idx,
+          onProviderTask: req.onProviderTask,
           }),
           2,
           `video scene ${scene.idx}`,
         );
+        await req.onProgress?.({ stage: "video", sceneIndex: scene.idx, message: `Escena ${scene.idx}/${script.scenes.length} lista.` });
         logger.info({ sceneIdx: scene.idx, clipBytes: buf.length, dur, videoPromptHead: cleanVideoPrompt.slice(0, 200) }, "🎬 clip generated");
         return { idx: scene.idx, buffer: buf, mime: "video/mp4", durationSec: dur };
       }),
@@ -923,6 +933,7 @@ export async function generateCinematicMultiShot(
   //       their original visual and the SAME continuous voice plays as VO).
   let voiceoverBuffer: Buffer | undefined;
   if (req.narration?.enabled) {
+    await req.onProgress?.({ stage: "audio", message: "Generando voz en off…" });
     const fullScript = script.scenes.map((s) => s.voiceoverLine).join(" ");
     if (fullScript.trim().length > 0) {
       voiceoverBuffer = await generateTTS(fullScript, {
@@ -1028,11 +1039,13 @@ export async function generateCinematicMultiShot(
             : "cross_dissolve",
     clipDurationsSec: renderClips.map((c) => c.durationSec),
   });
+  await req.onProgress?.({ stage: "compose", message: "Montando el anuncio cinematográfico…" });
   logger.info({ concatBytes: concatenated.length }, "🎬 concat ready");
 
   // ── 6. Music (optional) ─────────────────────────────────────────────────
   let musicBuffer: Buffer | undefined;
   if (req.music?.enabled) {
+    await req.onProgress?.({ stage: "audio", message: "Generando música…" });
     const musicPrompt = req.music.prompt
       || `${req.style} background music for a ${req.productName} ad, no vocals, builds energy, fits ${totalSec} seconds`;
     try {
