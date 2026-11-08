@@ -5,7 +5,8 @@ import { eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { safeDecrypt } from "../lib/crypto.js";
 import { businessYmd } from "../lib/tz.js";
-import { syncLocalSubscriptionFromStripeEvent } from "../lib/subscription-cancel.js";
+import { constructStripeWebhookEvent, handleStripeEvent } from "../lib/stripe-billing.js";
+import { billingWebhookSecrets } from "../lib/stripe-webhook-setup.js";
 
 const router = Router();
 
@@ -28,21 +29,6 @@ function verifyWooCommerceHmac(secret: string, rawBody: Buffer, sigHeader: strin
   const digest = createHmac("sha256", secret).update(rawBody).digest("base64");
   try {
     const a = Buffer.from(digest), b = Buffer.from(sigHeader);
-    return a.length === b.length && timingSafeEqual(a, b);
-  } catch { return false; }
-}
-
-function verifyStripeSignature(secret: string, rawBody: Buffer, sigHeader: string): boolean {
-  // SECURITY: fail-closed — reject ALL requests if secret is not configured
-  if (!secret) return false;
-  try {
-    const parts = sigHeader.split(",");
-    const ts = parts.find(p => p.startsWith("t="))?.split("=")[1];
-    const v1 = parts.find(p => p.startsWith("v1="))?.split("=")[1];
-    if (!ts || !v1) return false;
-    const payload = `${ts}.${rawBody.toString("utf8")}`;
-    const digest = createHmac("sha256", secret).update(payload).digest("hex");
-    const a = Buffer.from(digest), b = Buffer.from(v1);
     return a.length === b.length && timingSafeEqual(a, b);
   } catch { return false; }
 }
@@ -375,20 +361,24 @@ router.post("/webhooks/prestashop/:projectId", async (req: Request, res: Respons
   }
 });
 
-// ─── STRIPE: invoice.paid / subscription events ───────────────────────────────
-// For client Stripe accounts — events from their connected accounts
+// ─── STRIPE ───────────────────────────────────────────────────────────────────
 // URL: /api/webhooks/stripe
+//   · Eventos de la PLATAFORMA (sin event.account): altas, renovaciones, impagos y bajas de
+//     packs/servicios. Se delegan en handleStripeEvent, la misma función idempotente que usa
+//     /api/billing/stripe/webhook: una cancelación se procesa igual llegue por la URL que llegue.
+//   · Eventos de CUENTAS CONECTADAS (event.account = cuenta Stripe del cliente): solo alimentan
+//     los ingresos del proyecto vinculado. Nunca tocan la tabla subscriptions de la plataforma.
 router.post("/webhooks/stripe", async (req: Request, res: Response) => {
   try {
-    const secret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
-    const rawBody: Buffer = (req as any).rawBody ?? Buffer.from(JSON.stringify(req.body));
-    const sigHeader = (req.headers["stripe-signature"] as string) ?? "";
-    if (!verifyStripeSignature(secret, rawBody, sigHeader)) {
-      logger.warn("Stripe webhook signature inválida");
+    const rawBody: Buffer | undefined = (req as any).rawBody;
+    const sigHeader = req.headers["stripe-signature"] as string | undefined;
+    const verified = constructStripeWebhookEvent(rawBody, sigHeader, billingWebhookSecrets());
+    if ("error" in verified) {
+      logger.warn({ err: verified.error }, "Stripe webhook signature inválida");
       return void res.status(401).json({ error: "Signature inválida" });
     }
 
-    const event = req.body as Record<string, any>;
+    const event = verified.event as unknown as Record<string, any>;
     const eventType: string = event.type ?? "";
     const obj = event.data?.object ?? {};
     // Connected account (client's Stripe account)
@@ -396,78 +386,46 @@ router.post("/webhooks/stripe", async (req: Request, res: Response) => {
 
     logger.info({ eventType, connectedAccountId }, "Stripe webhook recibido");
 
+    if (!connectedAccountId) {
+      try {
+        const outcome = await handleStripeEvent(verified.event);
+        logger.info({ eventType, eventId: event.id, outcome }, "Stripe (plataforma) procesado por handleStripeEvent");
+      } catch (err) {
+        // 500 → Stripe REINTENTA el evento: con un 200 se perdería (p. ej. la fila local seguiría
+        // en "active" tras una baja y el borrado del usuario quedaría bloqueado con 409).
+        logger.error({ err, eventType, eventId: event.id }, "❌ Error procesando evento de Stripe de la plataforma; se pide reintento");
+        return void res.status(500).json({ received: false, error: "No se pudo procesar el evento; Stripe reintentará" });
+      }
+      return void res.json({ received: true });
+    }
+
     if (eventType === "invoice.paid" || eventType === "charge.succeeded") {
       const amount = (obj.amount_paid ?? obj.amount ?? 0) / 100;
       const currency = (obj.currency ?? "eur").toUpperCase();
-      if (connectedAccountId) {
-        // Find project linked to this Stripe account
-        const [proj] = await db.select({ id: projectsTable.id })
-          .from(projectsTable)
-          .where(eq(projectsTable.shopDomain, connectedAccountId))
-          .limit(1);
-        const projectId = proj?.id;
-        if (projectId) {
-          const today = businessYmd(); // día de negocio (Europe/Madrid), igual que el cierre diario
-          await db.execute(sql`
-            INSERT INTO revenue_snapshots (id, project_id, date, revenue, orders, aov, created_at)
-            VALUES (gen_random_uuid(), ${String(projectId)}, ${today}, ${amount}, 1, ${amount}, NOW())
-            ON CONFLICT (project_id, date)
-            DO UPDATE SET revenue = revenue_snapshots.revenue + ${amount},
-                          orders = revenue_snapshots.orders + 1,
-                          aov = (revenue_snapshots.revenue + ${amount}) / (revenue_snapshots.orders + 1),
-                          updated_at = NOW()
-          `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
-          await db.execute(sql`
-            INSERT INTO events (id, project_id, event_type, payload, created_at)
-            VALUES (gen_random_uuid(), ${String(projectId)}, 'stripe_payment',
-              ${"Stripe: Pago recibido " + amount.toFixed(2) + " " + currency}, NOW())
-            ON CONFLICT DO NOTHING
-          `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
-          logger.info({ projectId, amount, currency }, "✅ Stripe payment registrado via webhook");
-        }
-      }
-    } else if (eventType === "checkout.session.completed") {
-      // Platform SaaS billing — activate plan for user after Stripe Checkout
-      const { userId, planId } = (obj.metadata ?? {}) as { userId?: string; planId?: string };
-      if (userId && planId && !connectedAccountId) {
-        try {
-          const { subscriptionsTable: subTable } = await import("@workspace/db");
-          const periodEnd = new Date();
-          periodEnd.setDate(periodEnd.getDate() + 30);
-          const existing = await db.select({ id: subTable.userId }).from(subTable).where(eq(subTable.userId, userId)).limit(1);
-          const updates = {
-            plan: planId,
-            status: "active" as const,
-            currentPeriodEnd: periodEnd,
-            trialEndsAt: null,
-            cancelAtPeriodEnd: 0,
-            stripeCustomerId: obj.customer ?? null,
-            stripeSubscriptionId: obj.subscription ?? null,
-          };
-          if (existing.length > 0) {
-            await db.update(subTable).set(updates).where(eq(subTable.userId, userId));
-          } else {
-            await db.insert(subTable).values({ userId, ...updates, storesLimit: 1, imagesIncluded: 10 });
-          }
-          logger.info({ userId, planId, sessionId: obj.id }, "✅ Plan SaaS activado via Stripe Checkout");
-        } catch (activateErr) {
-          logger.error({ activateErr, userId, planId }, "❌ Error activando plan SaaS tras Stripe Checkout");
-        }
-      }
-    } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
-      // Cancelación hecha fuera del panel (dashboard de Stripe, fin de periodo, impago agotado):
-      // la fila local con ese stripe_subscription_id pasa a "canceled" para que el borrado del
-      // usuario deje de devolver 409. `updated` solo actúa si el status ya no factura.
-      const customerId = obj.customer ?? "";
-      const deleted = eventType === "customer.subscription.deleted";
-      try {
-        const r = await syncLocalSubscriptionFromStripeEvent({ stripeSubscriptionId: obj.id, status: obj.status, deleted });
-        logger.info({ eventType, subscriptionId: obj.id, status: obj.status, customerId, connectedAccountId, ...r }, deleted ? "Stripe suscripción cancelada" : "Stripe suscripción actualizada");
-      } catch (syncErr) {
-        // Si la BD falla, se responde 500 para que Stripe REINTENTE el evento: con un 200 el evento
-        // se perdería y la fila local seguiría en "active" (borrado bloqueado con 409).
-        logger.error({ syncErr, eventType, subscriptionId: obj.id }, "❌ Error sincronizando suscripción cancelada desde Stripe; se pide reintento a Stripe");
-        return void res.status(500).json({ received: false, error: "No se pudo sincronizar la suscripción; Stripe reintentará" });
+      // Find project linked to this Stripe account
+      const [proj] = await db.select({ id: projectsTable.id })
+        .from(projectsTable)
+        .where(eq(projectsTable.shopDomain, connectedAccountId))
+        .limit(1);
+      const projectId = proj?.id;
+      if (projectId) {
+        const today = businessYmd(); // día de negocio (Europe/Madrid), igual que el cierre diario
+        await db.execute(sql`
+          INSERT INTO revenue_snapshots (id, project_id, date, revenue, orders, aov, created_at)
+          VALUES (gen_random_uuid(), ${String(projectId)}, ${today}, ${amount}, 1, ${amount}, NOW())
+          ON CONFLICT (project_id, date)
+          DO UPDATE SET revenue = revenue_snapshots.revenue + ${amount},
+                        orders = revenue_snapshots.orders + 1,
+                        aov = (revenue_snapshots.revenue + ${amount}) / (revenue_snapshots.orders + 1),
+                        updated_at = NOW()
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
+        await db.execute(sql`
+          INSERT INTO events (id, project_id, event_type, payload, created_at)
+          VALUES (gen_random_uuid(), ${String(projectId)}, 'stripe_payment',
+            ${"Stripe: Pago recibido " + amount.toFixed(2) + " " + currency}, NOW())
+          ON CONFLICT DO NOTHING
+        `).catch(err => logger.error({ err }, "webhook-gateway: SQL failed"));
+        logger.info({ projectId, amount, currency }, "✅ Stripe payment registrado via webhook");
       }
     } else if (eventType === "charge.refunded") {
       const amount = (obj.amount_refunded ?? 0) / 100;
