@@ -31,6 +31,8 @@ vi.mock("./logger.js", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: v
 
 const { PgRateLimitStore } = await import("./pg-rate-limit-store.js");
 const { default: rateLimit } = await import("express-rate-limit");
+const { createContactRateLimiter, CONTACT_HOURLY_LIMIT } = await import("./contact-rate-limit.js");
+const { claimContactSubmission } = await import("./contact-idempotency.js");
 
 const HOUR = 60 * 60 * 1000;
 
@@ -46,14 +48,57 @@ describe("límite del formulario de contacto (PgRateLimitStore «contact»)", ()
     failQueries = false;
   });
 
-  it("app.ts monta el limitador de /api/contact con el store persistente y 5 por hora", async () => {
+  it("la ruta de contacto usa el cupo persistente y app.ts ya no cuenta antes de la ruta", async () => {
     const { readFile } = await import("node:fs/promises");
-    const src = await readFile(new URL("../app.ts", import.meta.url), "utf8");
-    const block = src.slice(src.indexOf("const contactLimiter"), src.indexOf("});", src.indexOf("const contactLimiter")));
-    expect(block).toContain('store: new PgRateLimitStore("contact")');
-    expect(block).toMatch(/max:\s*5,/);
-    expect(block).toMatch(/windowMs:\s*60 \* 60 \* 1000/);
-    expect(src).toContain('app.use("/api/contact", contactLimiter)');
+    const route = await readFile(new URL("../routes/contact.ts", import.meta.url), "utf8");
+    expect(route).toContain('createContactRateLimiter(new PgRateLimitStore("contact"))');
+    expect(route).toContain("() => checkContactRateLimit(req.ip");
+    expect(route).not.toContain("contactRateMap");
+    const app = await readFile(new URL("../app.ts", import.meta.url), "utf8");
+    expect(app).not.toMatch(/app\.use\("\/api\/contact"/);
+    expect(CONTACT_HOURLY_LIMIT).toBe(5);
+  });
+
+  describe("formulario: solo cuentan las solicitudes nuevas", () => {
+    const records = new Map<string, { action: string; details: string }>();
+    const submissions = {
+      find: async (id: string) => records.get(id),
+      insert: async (r: { id: string; action: string; details: string }) => {
+        if (records.has(r.id)) return false;
+        records.set(r.id, { action: r.action, details: r.details });
+        return true;
+      },
+    };
+    const lead = (n: number) => ({ name: `Cliente ${n}`, email: `c${n}@example.invalid`, services: [] });
+    // Un limitador nuevo por solicitud = el API se reinicia entre envíos.
+    const submit = (key: string, n: number, ip = "1.2.3.4") =>
+      claimContactSubmission(key, lead(n), submissions, () => createContactRateLimiter(new PgRateLimitStore("contact"))(ip));
+
+    beforeEach(() => records.clear());
+
+    it("5 nuevas pasan, la sexta da rate_limited y un reintento con la misma clave no gasta cupo", async () => {
+      expect(await submit("clave-solicitud-0001", 1)).toBe("accepted");
+      // Reintento idempotente de la primera: no consume.
+      expect(await submit("clave-solicitud-0001", 1)).toBe("duplicate");
+      for (let n = 2; n <= 5; n++) expect(await submit(`clave-solicitud-000${n}`, n)).toBe("accepted");
+      expect(table.get("contact:1.2.3.4")?.total_hits).toBe(5);
+
+      // Con el cupo agotado, un reintento confirmado sigue respondiendo como éxito...
+      expect(await submit("clave-solicitud-0003", 3)).toBe("duplicate");
+      expect(table.get("contact:1.2.3.4")?.total_hits).toBe(5);
+      // ...y la sexta solicitud nueva se rechaza.
+      expect(await submit("clave-solicitud-0006", 6)).toBe("rate_limited");
+      expect(records.size).toBe(5);
+
+      // Otra IP tiene su propio cupo.
+      expect(await submit("clave-solicitud-0007", 7, "5.6.7.8")).toBe("accepted");
+    });
+
+    it("si la base de datos falla, no deja pasar una solicitud nueva", async () => {
+      failQueries = true;
+      expect(await submit("clave-solicitud-0001", 1)).toBe("rate_limited");
+      expect(records.size).toBe(0);
+    });
   });
 
   it("el cupo sobrevive a un reinicio y se comparte entre instancias", async () => {

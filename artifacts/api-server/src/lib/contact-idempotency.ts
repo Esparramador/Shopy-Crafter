@@ -66,13 +66,13 @@ export async function claimContactSubmission(
   key: string,
   data: object,
   store: ContactSubmissionStore,
-  allowNewRequest?: () => boolean,
+  allowNewRequest?: () => boolean | Promise<boolean>,
 ): Promise<ContactSubmissionClaim> {
   const id = getContactSubmissionId(key);
   const requestHash = hashContactSubmission(data);
   const existing = await store.find(id);
   if (existing) return isSameRequest(existing, requestHash) ? "duplicate" : "key_reused";
-  if (allowNewRequest && !allowNewRequest()) return "rate_limited";
+  if (allowNewRequest && !(await allowNewRequest())) return "rate_limited";
 
   const inserted = await store.insert({
     id,
