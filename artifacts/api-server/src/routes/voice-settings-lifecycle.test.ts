@@ -168,9 +168,9 @@ describe("#144 historial completo de la voz", () => {
     const seen: string[] = [];
     let cursor: string | null = null;
     do {
-      const r = await fetch(`${base}/voice/convai/voice-settings/history?limit=5${cursor ? `&before=${cursor}` : ""}`);
+      const r: Response = await fetch(`${base}/voice/convai/voice-settings/history?limit=5${cursor ? `&before=${cursor}` : ""}`);
       expect(r.status).toBe(200);
-      const page = await r.json();
+      const page: { entries: Array<{ id: string }>; nextCursor: string | null } = await r.json();
       seen.push(...page.entries.map((e: { id: string }) => e.id));
       cursor = page.nextCursor;
     } while (cursor);
