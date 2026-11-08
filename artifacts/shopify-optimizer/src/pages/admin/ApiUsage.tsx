@@ -5,8 +5,10 @@ import {
 import {
   TrendingUp, TrendingDown, Minus, RefreshCw, ChevronLeft, ChevronRight,
   DollarSign, Zap, Activity, BarChart2, Download, Mail, CheckCircle, AlertCircle,
-  Bell, BellOff, Save, MessageSquare, X,
+  Bell, BellOff, Save, MessageSquare, X, Send, Trophy,
 } from "lucide-react";
+import ProjectCostModal from "@/components/admin/ProjectCostModal";
+import { providerBudgetsPayload, rankProjects, type ProjectCostInput } from "@/lib/api-usage-ui";
 
 import { getModelShortName } from "../../lib/model-aliases";
 
@@ -179,6 +181,104 @@ interface AlertSettings {
   alertEmail:   string;
   enabled:      boolean;
   lastSent:     string | null;
+  warnPct:      number;
+  providerThresholds: Record<string, number>;
+  gmailAvailable: boolean;
+}
+
+interface ReportSettings {
+  email: string;
+  monthlyEnabled: boolean;
+  envOverride: boolean | null;
+  monthlyEffective: boolean;
+  lastMonthSent: string | null;
+  gmailAvailable: boolean;
+}
+
+const BUDGET_PROVIDERS = PROVIDERS.filter(p => p !== "all");
+
+const inputStyle: React.CSSProperties = {
+  width: "100%", boxSizing: "border-box",
+  background: "var(--ink,#0f0f1a)", border: "1px solid var(--border,rgba(255,255,255,0.1))",
+  borderRadius: 8, padding: "9px 12px", color: "var(--t,#fff)", fontSize: 13,
+};
+const labelStyle: React.CSSProperties = {
+  fontSize: 11, color: "var(--t3,#666)", fontWeight: 600, letterSpacing: "0.04em",
+  textTransform: "uppercase", display: "block", marginBottom: 6,
+};
+
+/** Ranking de proyectos por coste IA del mes en curso (top 10). Cada fila abre el detalle. */
+function TopProjectsCard({ onOpen }: { onOpen: (p: { projectId: number; name: string }) => void }) {
+  const [rows, setRows] = useState<ProjectCostInput[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    fetch(`${API_BASE}/api/api-usage/by-project`, { credentials: "include" })
+      .then(async r => { if (!r.ok) throw new Error(`Error ${r.status}`); return r.json(); })
+      .then((d: ProjectCostInput[]) => setRows(Array.isArray(d) ? d : []))
+      .catch(e => setError(e instanceof Error ? e.message : String(e)));
+  }, []);
+  const top = rows ? rankProjects(rows, 10) : [];
+  const th: React.CSSProperties = { textAlign: "left", padding: "8px 10px", fontSize: 11, color: "var(--t3,#666)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap" };
+  const td: React.CSSProperties = { padding: "9px 10px", fontSize: 13, color: "var(--t,#fff)", borderTop: "1px solid var(--border,rgba(255,255,255,0.06))" };
+  return (
+    <Card style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <Trophy size={16} style={{ color: "var(--gold,#f59e0b)" }} />
+        <div>
+          <div style={{ fontWeight: 600, color: "var(--t,#fff)", fontSize: 14 }}>Top proyectos por coste</div>
+          <div style={{ fontSize: 11, color: "var(--t3,#666)", marginTop: 2 }}>Mes en curso · pulsa una fila para ver el detalle</div>
+        </div>
+      </div>
+      {error ? (
+        <div style={{ fontSize: 13, color: "#ef4444" }}>No se pudo cargar el ranking: {error}</div>
+      ) : !rows ? (
+        <div style={{ fontSize: 13, color: "var(--t3,#666)" }}>Cargando…</div>
+      ) : top.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--t3,#666)" }}>Sin consumo este mes</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>
+              <th style={th}>#</th><th style={th}>Proyecto</th><th style={th}>Tienda</th>
+              <th style={{ ...th, textAlign: "right" }}>Coste USD</th><th style={{ ...th, textAlign: "right" }}>Llamadas</th><th style={{ ...th, textAlign: "right" }}>% del total</th>
+            </tr></thead>
+            <tbody>
+              {top.map((r, i) => {
+                const { pct, name } = r;
+                const clickable = r.projectId != null;
+                return (
+                  <tr
+                    key={r.projectId ?? "none"}
+                    onClick={clickable ? () => onOpen({ projectId: r.projectId!, name }) : undefined}
+                    onKeyDown={clickable ? e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen({ projectId: r.projectId!, name }); } } : undefined}
+                    tabIndex={clickable ? 0 : undefined}
+                    role={clickable ? "button" : undefined}
+                    className={clickable ? "cost-rank-row" : undefined}
+                    style={{ cursor: clickable ? "pointer" : "default" }}
+                  >
+                    <td style={{ ...td, color: "var(--t3,#666)", width: 32 }}>{i + 1}</td>
+                    <td style={td}>{name}</td>
+                    <td style={{ ...td, color: "var(--t3,#888)", fontSize: 12 }}>{r.shopDomain ?? "—"}</td>
+                    <td style={{ ...td, textAlign: "right", color: "var(--gold,#f59e0b)", fontWeight: 700, fontFamily: "monospace" }}>{fmt(r.costUsd, 4)}</td>
+                    <td style={{ ...td, textAlign: "right" }}>{fmtNum(r.calls)}</td>
+                    <td style={{ ...td, textAlign: "right", minWidth: 120 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                        <div style={{ width: 60, height: 5, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                          <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", background: "linear-gradient(90deg,#c8a84b,#f59e0b)", transition: "width 0.5s ease" }} />
+                        </div>
+                        <span style={{ fontSize: 12 }}>{pct.toFixed(1)}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <style>{`.cost-rank-row{transition:background .15s ease}.cost-rank-row:hover,.cost-rank-row:focus-visible{background:rgba(200,168,75,0.06);outline:none}`}</style>
+        </div>
+      )}
+    </Card>
+  );
 }
 
 interface MarginRow {
@@ -265,6 +365,15 @@ export default function ApiUsage() {
   const [alertEmail,        setAlertEmail]        = useState("");
   const [alertEnabled,      setAlertEnabled]      = useState(true);
   const [savingAlert,       setSavingAlert]       = useState(false);
+  const [alertWarnPct,      setAlertWarnPct]      = useState("80");
+  const [providerBudgets,   setProviderBudgets]   = useState<Record<string, string>>({});
+  const [testingAlert,      setTestingAlert]      = useState(false);
+
+  const [reportSettings,    setReportSettings]    = useState<ReportSettings | null>(null);
+  const [reportEmail,       setReportEmail]       = useState("");
+  const [reportMonthly,     setReportMonthly]     = useState(false);
+  const [savingReport,      setSavingReport]      = useState(false);
+  const [costProject,       setCostProject]       = useState<{ projectId: number; name: string } | null>(null);
 
   const [chatSessions,      setChatSessions]      = useState<ChatSessionsData | null>(null);
   const [chatSessionsPage,  setChatSessionsPage]  = useState(1);
@@ -307,6 +416,20 @@ export default function ApiUsage() {
         setAlertThreshold(data.thresholdUsd > 0 ? String(data.thresholdUsd) : "");
         setAlertEmail(data.alertEmail);
         setAlertEnabled(data.enabled);
+        setAlertWarnPct(String(data.warnPct ?? 80));
+        setProviderBudgets(Object.fromEntries(Object.entries(data.providerThresholds ?? {}).map(([k, v]) => [k, String(v)])));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const loadReportSettings = useCallback(async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/api-usage/report-settings`, { credentials: "include" });
+      if (r.ok) {
+        const data: ReportSettings = await r.json();
+        setReportSettings(data);
+        setReportEmail(data.email);
+        setReportMonthly(data.monthlyEnabled);
       }
     } catch { /* ignore */ }
   }, []);
@@ -358,7 +481,8 @@ export default function ApiUsage() {
     loadLogs(1);
     loadChatSessions(1);
     loadAlertSettings();
-  }, [loadStats, loadLogs, loadChatSessions, loadAlertSettings]);
+    loadReportSettings();
+  }, [loadStats, loadLogs, loadChatSessions, loadAlertSettings, loadReportSettings]);
 
   function handlePageChange(np: number) {
     setPage(np);
@@ -374,7 +498,12 @@ export default function ApiUsage() {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thresholdUsd: thresholdVal, alertEmail, enabled: alertEnabled }),
+        body: JSON.stringify({
+          thresholdUsd: thresholdVal, alertEmail, enabled: alertEnabled,
+          warnPct: Number(alertWarnPct) || 0,
+          // Todos los motores: vacío = sin tope propio (el servidor borra el ajuste).
+          providerThresholds: providerBudgetsPayload(BUDGET_PROVIDERS, providerBudgets),
+        }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error ?? `Error ${r.status}`);
@@ -384,6 +513,44 @@ export default function ApiUsage() {
       setToast({ type: "err", msg: `❌ ${err instanceof Error ? err.message : String(err)}` });
     } finally {
       setSavingAlert(false);
+      setTimeout(() => setToast(null), 5000);
+    }
+  }
+
+  async function handleTestAlert() {
+    setTestingAlert(true);
+    setToast(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/api-usage/alert-settings/test`, { method: "POST", credentials: "include" });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error ?? `Error ${r.status}`);
+      setToast({ type: "ok", msg: `✅ Alerta de prueba enviada a ${data.recipient}` });
+    } catch (err) {
+      setToast({ type: "err", msg: `❌ ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setTestingAlert(false);
+      setTimeout(() => setToast(null), 6000);
+    }
+  }
+
+  async function handleSaveReport() {
+    setSavingReport(true);
+    setToast(null);
+    try {
+      const r = await fetch(`${API_BASE}/api/api-usage/report-settings`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: reportEmail, monthlyEnabled: reportMonthly }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error ?? `Error ${r.status}`);
+      await loadReportSettings();
+      setToast({ type: "ok", msg: "✅ Destino del informe guardado" });
+    } catch (err) {
+      setToast({ type: "err", msg: `❌ ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setSavingReport(false);
       setTimeout(() => setToast(null), 5000);
     }
   }
@@ -422,7 +589,7 @@ export default function ApiUsage() {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error ?? `Error ${r.status}`);
-      setToast({ type: "ok", msg: `✅ Informe enviado a craftershopy@gmail.com (${data.rows} registros)` });
+      setToast({ type: "ok", msg: `✅ Informe enviado a ${data.recipient} (${data.rows} registros)` });
     } catch (err) {
       setToast({ type: "err", msg: `❌ ${err instanceof Error ? err.message : String(err)}` });
     } finally {
@@ -457,6 +624,10 @@ export default function ApiUsage() {
         </div>
       )}
 
+      {costProject && (
+        <ProjectCostModal projectId={costProject.projectId} name={costProject.name} onClose={() => setCostProject(null)} />
+      )}
+
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
@@ -487,7 +658,7 @@ export default function ApiUsage() {
           <button
             onClick={handleSendEmail}
             disabled={sending}
-            title="Enviar el informe CSV del período seleccionado por email"
+            title={`Enviar el informe CSV del período seleccionado a ${reportSettings?.email ?? "el email configurado"}`}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               background: sending ? "rgba(45,212,159,0.04)" : "rgba(45,212,159,0.08)",
@@ -500,6 +671,11 @@ export default function ApiUsage() {
           >
             <Mail size={14} style={{ animation: sending ? "spin 0.6s linear infinite" : "none" }} />
             {sending ? "Enviando…" : "Enviar por email"}
+            {reportSettings && !sending && (
+              <span style={{ fontSize: 11, fontWeight: 400, color: "rgba(45,212,159,0.7)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                → {reportSettings.email}
+              </span>
+            )}
           </button>
           <button
             onClick={() => { loadStats(); loadLogs(page); }}
@@ -642,6 +818,8 @@ export default function ApiUsage() {
         </Card>
       )}
 
+      <TopProjectsCard onOpen={setCostProject} />
+
       {/* Budget Alert Panel */}
       <Card style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -658,7 +836,7 @@ export default function ApiUsage() {
             <div>
               <div style={{ fontWeight: 700, color: "var(--t,#fff)", fontSize: 14 }}>Alerta de Presupuesto Mensual</div>
               <div style={{ fontSize: 11, color: "var(--t3,#666)", marginTop: 2 }}>
-                Email automático cuando el gasto IA supera el umbral · revisión diaria 8am
+                Aviso al {Number(alertWarnPct) > 0 ? `${alertWarnPct}%` : "—"} (una vez al mes) y alerta al superar el umbral · revisión diaria 8am
               </div>
             </div>
           </div>
@@ -762,6 +940,80 @@ export default function ApiUsage() {
           </div>
         </div>
 
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 12, alignItems: "end", marginTop: 14 }}>
+          <div>
+            <label htmlFor="alert-warn-pct" style={labelStyle}>Aviso previo (% del umbral)</label>
+            <div style={{ position: "relative" }}>
+              <input
+                id="alert-warn-pct"
+                type="number" min="0" max="99" step="1"
+                value={alertWarnPct}
+                onChange={e => setAlertWarnPct(e.target.value)}
+                style={{ ...inputStyle, paddingRight: 28 }}
+              />
+              <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "var(--t3,#666)", fontSize: 13 }}>%</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--t3,#666)", lineHeight: 1.5, paddingBottom: 4 }}>
+            0 = sin aviso previo. El aviso llega en ámbar, una vez al mes por umbral; la alerta roja, como mucho una vez al día.
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", paddingBottom: 2 }}>
+            <button
+              onClick={handleTestAlert}
+              disabled={testingAlert || !alertSettings?.gmailAvailable}
+              title={alertSettings?.gmailAvailable ? `Enviar ahora una alerta de prueba a ${alertSettings.alertEmail}` : "Gmail no está configurado en este entorno"}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.3)",
+                borderRadius: 8, padding: "9px 16px",
+                color: testingAlert || !alertSettings?.gmailAvailable ? "rgba(96,165,250,0.4)" : "#60a5fa",
+                cursor: testingAlert || !alertSettings?.gmailAvailable ? "not-allowed" : "pointer",
+                fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "all 0.2s",
+              }}
+            >
+              <Send size={13} style={{ animation: testingAlert ? "spin 0.6s linear infinite" : "none" }} />
+              {testingAlert ? "Enviando…" : "Probar alerta"}
+            </button>
+          </div>
+        </div>
+        {alertSettings && !alertSettings.gmailAvailable && (
+          <div style={{ marginTop: 8, fontSize: 11, color: "#f59e0b" }}>Gmail no está configurado en este entorno: ni la prueba ni la alerta real pueden enviarse.</div>
+        )}
+
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border,rgba(255,255,255,0.06))" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--t,#fff)", marginBottom: 4 }}>Presupuesto por motor (USD/mes)</div>
+          <div style={{ fontSize: 11, color: "var(--t3,#666)", marginBottom: 12 }}>Opcional. Cada motor con tope propio avisa y alerta por separado; vacío = sin tope.</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10 }}>
+            {BUDGET_PROVIDERS.map(p => {
+              const spent = stats?.byProvider.find(b => b.provider === p)?.costUsd ?? 0;
+              const cap = parseFloat(providerBudgets[p] ?? "") || 0;
+              const pct = cap > 0 ? (spent / cap) * 100 : 0;
+              return (
+                <div key={p}>
+                  <label htmlFor={`budget-${p}`} style={{ ...labelStyle, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: PROVIDER_COLORS[p] ?? "#888" }} />
+                    {p}
+                  </label>
+                  <input
+                    id={`budget-${p}`}
+                    type="number" min="0" step="0.01"
+                    value={providerBudgets[p] ?? ""}
+                    onChange={e => setProviderBudgets(prev => ({ ...prev, [p]: e.target.value }))}
+                    placeholder="sin tope"
+                    style={{ ...inputStyle, padding: "7px 10px" }}
+                  />
+                  {cap > 0 && (
+                    <div style={{ fontSize: 10, marginTop: 3, color: pct >= 100 ? "#ef4444" : pct >= (Number(alertWarnPct) || 101) ? "#f59e0b" : "var(--t3,#666)" }}>
+                      {fmt(spent, 2)} · {pct.toFixed(0)}%
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--t3,#555)", marginTop: 8 }}>Se guardan con el botón «Guardar» de arriba. El % usa el gasto del período filtrado.</div>
+        </div>
+
         {alertSettings?.lastSent && (
           <div style={{ marginTop: 12, fontSize: 11, color: "var(--t3,#555)" }}>
             Última alerta enviada: <span style={{ color: "var(--t3,#777)" }}>{alertSettings.lastSent}</span>
@@ -776,7 +1028,7 @@ export default function ApiUsage() {
                 width: `${Math.min(100, (stats.totals.current.costUsd / alertSettings.thresholdUsd) * 100)}%`,
                 background: stats.totals.current.costUsd >= alertSettings.thresholdUsd
                   ? "linear-gradient(90deg,#ef4444,#dc2626)"
-                  : stats.totals.current.costUsd >= alertSettings.thresholdUsd * 0.8
+                  : alertSettings.warnPct > 0 && stats.totals.current.costUsd >= alertSettings.thresholdUsd * (alertSettings.warnPct / 100)
                     ? "linear-gradient(90deg,#f59e0b,#d97706)"
                     : "linear-gradient(90deg,#2dd49f,#10b981)",
               }} />
@@ -790,6 +1042,71 @@ export default function ApiUsage() {
             </div>
           </div>
         )}
+      </Card>
+
+      {/* Monthly report settings */}
+      <Card style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: "50%", background: "rgba(45,212,159,0.1)",
+            border: "1px solid rgba(45,212,159,0.28)", display: "flex", alignItems: "center", justifyContent: "center", color: "#2dd49f",
+          }}>
+            <Mail size={15} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, color: "var(--t,#fff)", fontSize: 14 }}>Informe de costes por email</div>
+            <div style={{ fontSize: 11, color: "var(--t3,#666)", marginTop: 2 }}>
+              Destino del botón «Enviar por email» y del informe automático del día 1 (mes anterior completo, 8:00)
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,1fr) auto auto", gap: 12, alignItems: "end" }}>
+          <div>
+            <label htmlFor="report-email" style={labelStyle}>Email de destino para informes</label>
+            <input
+              id="report-email" type="email" value={reportEmail}
+              onChange={e => setReportEmail(e.target.value)}
+              placeholder="admin@ejemplo.com" style={inputStyle}
+            />
+          </div>
+          <button
+            onClick={() => setReportMonthly(v => !v)}
+            disabled={reportSettings?.envOverride != null}
+            title={reportSettings?.envOverride != null ? "Lo fija la variable de entorno MONTHLY_COST_REPORT" : "Activar o desactivar el envío del día 1"}
+            aria-pressed={reportSettings?.envOverride ?? reportMonthly}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: (reportSettings?.envOverride ?? reportMonthly) ? "rgba(45,212,159,0.08)" : "rgba(100,100,100,0.08)",
+              border: `1px solid ${(reportSettings?.envOverride ?? reportMonthly) ? "rgba(45,212,159,0.28)" : "rgba(100,100,100,0.2)"}`,
+              borderRadius: 8, padding: "9px 14px",
+              color: (reportSettings?.envOverride ?? reportMonthly) ? "#2dd49f" : "#888",
+              cursor: reportSettings?.envOverride != null ? "not-allowed" : "pointer",
+              fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "all 0.2s",
+            }}
+          >
+            {(reportSettings?.envOverride ?? reportMonthly) ? <Bell size={13} /> : <BellOff size={13} />}
+            {(reportSettings?.envOverride ?? reportMonthly) ? "Mensual activo" : "Mensual inactivo"}
+          </button>
+          <button
+            onClick={handleSaveReport}
+            disabled={savingReport}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: savingReport ? "rgba(200,168,75,0.06)" : "rgba(200,168,75,0.12)",
+              border: "1px solid rgba(200,168,75,0.35)", borderRadius: 8, padding: "9px 16px",
+              color: savingReport ? "rgba(200,168,75,0.5)" : "var(--gold,#f59e0b)",
+              cursor: savingReport ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "all 0.2s",
+            }}
+          >
+            <Save size={13} style={{ animation: savingReport ? "spin 0.6s linear infinite" : "none" }} />
+            {savingReport ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 11, color: "var(--t3,#555)", display: "flex", gap: 16, flexWrap: "wrap" }}>
+          {reportSettings?.envOverride != null && <span>Fijado por MONTHLY_COST_REPORT={String(reportSettings.envOverride)}</span>}
+          {reportSettings?.lastMonthSent && <span>Último informe mensual: {reportSettings.lastMonthSent}</span>}
+          {reportSettings && !reportSettings.gmailAvailable && <span style={{ color: "#f59e0b" }}>Gmail no está configurado en este entorno</span>}
+        </div>
       </Card>
 
       {/* Chat Sessions History */}
