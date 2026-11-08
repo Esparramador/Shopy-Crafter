@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import PublicLayout from "@/components/PublicLayout";
 import { sendContactRequest } from "@/lib/contact-request";
+import { notifyShopyControl } from "@/lib/shopy-control";
 
 const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const VIDEO_SRC = `${API_BASE}/assets/videos/alec_landing.mp4`;
@@ -507,6 +508,18 @@ export default function Contacto() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, services }),
       }, "public-contact");
+      notifyShopyControl({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        storeUrl: form.storeUrl,
+        services,
+        niche: form.niche,
+        customNiche: form.customNiche,
+        revenue: form.revenue,
+        socialMedia: form.socialMedia,
+        message: form.message,
+      });
       setStatus("sent");
     } catch (err: unknown) {
       setStatus("error");

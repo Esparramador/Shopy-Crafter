@@ -21,6 +21,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { sendContactRequest } from "@/lib/contact-request";
+import { notifyShopyControl } from "@/lib/shopy-control";
 
 const BASE_URL   = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const VIDEO_SRC  = `${BASE_URL}/assets/videos/alec_landing.mp4`;
@@ -225,6 +226,20 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
           body: JSON.stringify({ ...form, services }),
         }, "public-contact");
       }
+      notifyShopyControl({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        storeUrl: form.storeUrl,
+        services,
+        niche: form.niche,
+        customNiche: form.customNiche,
+        revenue: form.revenue,
+        socialMedia: form.socialMedia,
+        extraInfo: form.extraInfo,
+        suppliers: form.suppliers,
+        message: form.message,
+      });
       setStatus("sent");
     } catch (err: unknown) {
       setStatus("error");
