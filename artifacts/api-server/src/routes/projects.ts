@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import { projectsTable, platformSettingsTable } from "@workspace/db";
 import type { PlatformType } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { refreshToken, validateToken, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify";
+import { clearRecentShopifyTokenFailure, refreshToken, validateToken, normalizeShopDomain, ShopifyAuthError } from "../lib/shopify";
 import { encrypt, safeDecrypt } from "../lib/crypto.js";
 import { verifyStripeSecretKey, saveDirectApiKey } from "../lib/stripe-tenant.js";
 import { recordAudit } from "../lib/audit.helper.js";
@@ -734,7 +734,7 @@ router.post("/projects/:projectId/reconnect", async (req, res): Promise<void> =>
         shopDomain: domain,
       }).where(eq(projectsTable.id, id));
   
-      const token = await refreshToken(id, domain, clientId, clientSecret);
+      const token = await refreshToken(id, domain, clientId, clientSecret, { force: true });
   
       invalidateCache("projects-");
       req.log.info({ projectId: id, domain }, "Store reconnected with new credentials");
@@ -827,6 +827,7 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
         accessToken: encrypt(newAccessToken),
         tokenExpiresAt: new Date(Date.now() + 365 * 24 * 3600 * 1000),
       }).where(eq(projectsTable.id, id));
+      clearRecentShopifyTokenFailure(id);
       await recordAudit({
         userId: req.session.userId!,
         action: "shopify_token_manual_update",
@@ -842,7 +843,7 @@ router.post("/projects/:projectId/refresh-token", async (req, res): Promise<void
     // Regenerate token using client_credentials grant
     try {
       const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-      const newToken = await refreshToken(id, project.shopDomain, project.clientId, plainSecret);
+      const newToken = await refreshToken(id, project.shopDomain, project.clientId, plainSecret, { force: true });
       await recordAudit({
         userId: req.session.userId!,
         action: "shopify_token_refresh",

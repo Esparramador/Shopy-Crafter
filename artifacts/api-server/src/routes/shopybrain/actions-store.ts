@@ -1119,7 +1119,7 @@ export async function runStoreActions(ctx: BrainActionCtx): Promise<BrainActionO
           if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
   
           const plainSecret = safeDecrypt(project.clientSecret) || project.clientSecret;
-          const newToken = await refreshToken(parseInt(projectId), project.shopDomain, project.clientId, plainSecret);
+          const newToken = await refreshToken(parseInt(projectId), project.shopDomain, project.clientId, plainSecret, { force: true });
           const [updated] = await db.select({ tokenExpiresAt: projectsTable.tokenExpiresAt }).from(projectsTable).where(eq(projectsTable.id, parseInt(projectId)));
   
           result = {

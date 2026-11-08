@@ -24,7 +24,7 @@ import { ensureAllKnowledgeDomains } from "./routes/shopybrain/shared.js";
 import { injectDbApiKeys } from "./routes/api-keys.js";
 import { db, usersTable, projectsTable, productsTable, omnicoreMemoriesTable, seoDataTable } from "@workspace/db";
 import { eq, sql, isNull, or, and } from "drizzle-orm";
-import { shopifyRequestPaged, shopifyGraphQL } from "./lib/shopify.js";
+import { ShopifyAuthError, shopifyRequestPaged, shopifyGraphQL } from "./lib/shopify.js";
 import { auditProduct } from "./lib/audit.js";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
@@ -175,12 +175,20 @@ async function warmupProdKnowledge() {
       const [prodCount] = await db.select({ c: sql<number>`count(*)` })
         .from(productsTable).where(eq(productsTable.projectId, project.id));
       const productTotal = Number(prodCount?.c ?? 0);
+      const tokenNeedsRefresh = platformType === "shopify"
+        && (!project.tokenExpiresAt || new Date(project.tokenExpiresAt).getTime() < Date.now() + 2 * 3600 * 1000);
 
       // La precarga de catálogo usa la API de Shopify: WooCommerce/PrestaShop se
       // sincronizan desde su propio flujo (antes se intentaba OAuth de Shopify
       // contra su dominio con sus claves y siempre fallaba).
-      if (productTotal === 0 && platformType === "shopify") {
-        logger.info({ projectId: project.id, domain: project.shopDomain }, "🔄 Warmup: syncing products from Shopify...");
+      // Si el token estaba vencido o próximo a vencer, sincronizamos también
+      // los catálogos ya existentes al renovarlo; así una conexión recuperada
+      // no se queda validada pero con los productos desactualizados.
+      if (platformType === "shopify" && (productTotal === 0 || tokenNeedsRefresh)) {
+        logger.info(
+          { projectId: project.id, domain: project.shopDomain, productTotal, tokenNeedsRefresh },
+          "🔄 Warmup: syncing products from Shopify..."
+        );
         try {
           let allProducts: ShopifyProductRaw[] = [];
           for (const st of ["active", "draft", "archived"]) {
@@ -286,7 +294,17 @@ async function warmupProdKnowledge() {
           await db.update(projectsTable).set({ productCount: allProducts.length, avgAuditScore: avgScore }).where(eq(projectsTable.id, project.id));
           logger.info({ projectId: project.id, synced: allProducts.length, avgScore }, "✅ Warmup: products synced from Shopify");
         } catch (err) {
-          logger.error({ err, projectId: project.id }, "⚠️ Warmup: product sync failed");
+          logger.error(
+            {
+              err,
+              projectId: project.id,
+              domain: project.shopDomain,
+              connectionStatus: err instanceof ShopifyAuthError ? err.failureKind ?? "shopify_auth_error" : undefined,
+              httpStatus: err instanceof ShopifyAuthError ? err.shopifyStatus : undefined,
+              credentialsChanged: false,
+            },
+            "⚠️ Warmup: Shopify product sync failed; stored credentials were left unchanged"
+          );
         }
       }
     }
