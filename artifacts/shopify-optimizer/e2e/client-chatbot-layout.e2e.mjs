@@ -175,6 +175,8 @@ try {
         for (const el of document.querySelectorAll("body *")) {
           if (panelEl.contains(el) || el.contains(panelEl)) continue;
           if (el.closest(".sc-cursor, .sc-cursor-ring")) continue;
+          // Contenedor vacío de avisos (Toaster): sin avisos no pinta nada.
+          if (el.tagName === "OL" && el.children.length === 0) continue;
           const cs = getComputedStyle(el);
           if (cs.position !== "fixed" || cs.visibility === "hidden" || cs.display === "none" || parseFloat(cs.opacity) === 0) continue;
           const r = el.getBoundingClientRect();
