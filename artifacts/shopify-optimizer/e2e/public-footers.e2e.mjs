@@ -120,7 +120,8 @@ try {
         let linkHit = true, linkHitBy = "";
         if (link) {
           link.scrollIntoView({ block: "center", behavior: "instant" });
-          const r = link.getBoundingClientRect();
+          // Primera línea del enlace: si el texto salta de línea, el centro de la caja cae entre líneas.
+          const r = link.getClientRects()[0] || link.getBoundingClientRect();
           const hit = document.elementFromPoint(r.left + Math.min(8, r.width / 2), r.top + r.height / 2);
           linkHit = Boolean(hit && (link === hit || link.contains(hit)));
           if (!linkHit) linkHitBy = hit ? `${hit.tagName.toLowerCase()}.${String(hit.className).slice(0, 40)}` : "nada";
