@@ -3,14 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 import sharp from "sharp";
 import { decodeQrImageAtNativeSize } from "../lib/card-qr-art.js";
 import {
-  isRetiredQrPortfolioImage, mergeGenericSeedCopy, removeRetiredQrPortfolioImages,
-  PATCH_PREVIOUS, PATCH_VERSION, SEED, SEED_VERSION,
+  isRetiredQrPortfolioImage, mergeGenericSeedCopy, removeRetiredQrPortfolioImages, mergeSeedProject, mergeSeedVariants,
+  seedDefaultsOf, confirmedPreLedgerDeletions,
+  PATCH_PREVIOUS, PATCH_VERSION, SEED, SEED_VERSION, type SeedProject, type SeedVariant,
 } from "./portfolio-seed.js";
 
 const migrationState = vi.hoisted(() => ({
   meta: {} as Record<string, string>,
   projects: [] as Array<Record<string, unknown>>,
   deletedSlugs: new Set<string>(),
+  snapshots: new Map<string, Record<string, unknown>>(),
   writes: [] as string[],
 }));
 
@@ -27,28 +29,76 @@ vi.mock("@workspace/db", () => ({
       if (text.includes("SELECT slug FROM portfolio_deleted_projects")) {
         return { rows: Array.from(migrationState.deletedSlugs, slug => ({ slug })) };
       }
+      if (text.includes("SELECT slug FROM portfolio_projects")) {
+        return { rows: migrationState.projects.map(row => ({ slug: row.slug })) };
+      }
+      if (text.includes("SELECT project FROM portfolio_deleted_projects WHERE slug")) {
+        const slug = String(values[0]);
+        return { rows: migrationState.deletedSlugs.has(slug) ? [{ project: migrationState.snapshots.get(slug) ?? null }] : [] };
+      }
+      if (text.includes("INSERT INTO portfolio_deleted_projects (slug) VALUES")) {
+        migrationState.deletedSlugs.add(String(values[0]));
+        migrationState.writes.push(text);
+        return { rows: [] };
+      }
       if (text.includes("WITH removed AS") && text.includes("DELETE FROM portfolio_projects")) {
         const project = migrationState.projects.find(row => row.id === values[0]);
         if (!project) return { rows: [] };
         migrationState.projects = migrationState.projects.filter(row => row.id !== values[0]);
         migrationState.deletedSlugs.add(String(project.slug));
+        migrationState.snapshots.set(String(project.slug), structuredClone(project));
         migrationState.writes.push(text);
-        return { rows: [{ images: project.images }] };
+        return { rows: [{ slug: project.slug }] };
       }
-      if (text.includes("SELECT id") && text.includes("FROM portfolio_projects WHERE slug")) {
+      if (text.includes("WITH restored AS")) {
+        const [slug, title, client, category, summary, description, tech, features, status, liveUrl, appUrl, images, variants, sortOrder, published, defaults, existsSlug] = values;
+        if (!migrationState.deletedSlugs.has(String(existsSlug)) || migrationState.projects.some(row => row.slug === slug)) return { rows: [] };
+        const row = {
+          id: 100 + migrationState.projects.length, slug, title, client, category, summary, description, status,
+          tech: JSON.parse(String(tech)), features: JSON.parse(String(features)), live_url: liveUrl, app_url: appUrl,
+          images: JSON.parse(String(images)), variants: JSON.parse(String(variants)), sort_order: sortOrder, published,
+          seed_defaults: defaults === null ? null : JSON.parse(String(defaults)),
+        };
+        migrationState.projects.push(row);
+        migrationState.deletedSlugs.delete(String(slug));
+        migrationState.snapshots.delete(String(slug));
+        migrationState.writes.push(text);
+        return { rows: [row] };
+      }
+      if ((text.includes("SELECT id") || text.includes("SELECT *")) && text.includes("FROM portfolio_projects WHERE slug")) {
         const project = migrationState.projects.find(row => row.slug === values[0]);
         return { rows: project ? [project] : [] };
       }
       if (text.includes("INSERT INTO portfolio_projects")) {
-        const [slug, title, client, category, summary, description, tech, features, status, liveUrl, appUrl, images, variants, sortOrder] = values;
+        const [slug, title, client, category, summary, description, tech, features, status, liveUrl, appUrl, images, variants, sortOrder, defaults] = values;
         if (!migrationState.projects.some(row => row.slug === slug)) {
           migrationState.projects.push({
             id: migrationState.projects.length + 1,
             slug, title, client, category, summary, description,
-            tech: JSON.parse(String(tech)), features: JSON.parse(String(features)), status, liveUrl, appUrl,
-            images: JSON.parse(String(images)), variants: JSON.parse(String(variants)), sortOrder,
+            tech: JSON.parse(String(tech)), features: JSON.parse(String(features)), status, live_url: liveUrl, app_url: appUrl,
+            images: JSON.parse(String(images)), variants: JSON.parse(String(variants)), sort_order: sortOrder,
+            seed_defaults: JSON.parse(String(defaults)),
           });
         }
+        migrationState.writes.push(text);
+        return { rows: [] };
+      }
+      if (text.includes("SET seed_defaults =") && text.includes("seed_defaults IS NULL")) {
+        const [defaults, slug] = values;
+        const project = migrationState.projects.find(row => row.slug === slug);
+        if (project && project.seed_defaults == null) project.seed_defaults = JSON.parse(String(defaults));
+        return { rows: [] };
+      }
+      if (text.includes("UPDATE portfolio_projects SET") && text.includes("seed_defaults =")) {
+        const [title, client, category, summary, description, status, tech, features, liveUrl, appUrl, images, variants, sortOrder, defaults, id] = values;
+        const project = migrationState.projects.find(row => row.id === id);
+        if (!project) throw new Error(`Portfolio project not found for seed update: ${String(id)}`);
+        Object.assign(project, {
+          title, client, category, summary, description, status,
+          tech: JSON.parse(String(tech)), features: JSON.parse(String(features)), live_url: liveUrl, app_url: appUrl,
+          images: JSON.parse(String(images)), variants: JSON.parse(String(variants)), sort_order: sortOrder,
+          seed_defaults: JSON.parse(String(defaults)),
+        });
         migrationState.writes.push(text);
         return { rows: [] };
       }
@@ -92,7 +142,7 @@ vi.mock("../lib/media-store.js", () => ({
   saveMedia: vi.fn(), getMedia: vi.fn(), deleteMedia: vi.fn(), mediaIdFromUrl: vi.fn(),
 }));
 
-const { applySeed, applyPatches } = await import("./portfolio.js");
+const { applySeed, applyPatches, backfillPreLedgerDeletions, restorePortfolioProject, deletePortfolioProject } = await import("./portfolio.js");
 
 describe("reaplicación de migraciones del portfolio", () => {
   const existingAdminEdit = {
@@ -133,10 +183,7 @@ describe("reaplicación de migraciones del portfolio", () => {
     migrationState.deletedSlugs = new Set();
     migrationState.writes = [];
 
-    const { deletePortfolioProject } = await import("./portfolio.js");
-    await expect(deletePortfolioProject(7)).resolves.toEqual([
-      { url: "/portfolio/deleted.webp", alt: "Imagen" },
-    ]);
+    await expect(deletePortfolioProject(7)).resolves.toBe(true);
     expect(migrationState.projects).toEqual([]);
     expect(migrationState.deletedSlugs.has(deletedSlug)).toBe(true);
 
@@ -338,4 +385,159 @@ describe("lectura de los QR destacados después de redimensionar", () => {
       expect(Boolean(decoded) && decoded === expected, `Lectura fiel a ${width}px`).toBe(true);
     }
   }, 30_000);
+});
+
+const baseVariant: SeedVariant = {
+  name: "Versión A", client: "Cliente A", status: "En producción", summary: "Resumen A", description: "Descripción A",
+  features: ["Función A"], tech: ["Tec A"], images: [{ url: "/portfolio/a.webp", alt: "A" }],
+};
+const oldSeed: SeedProject = {
+  slug: "proyecto-prueba", title: "Título v1", client: "Cliente v1", category: "Categoría v1", status: "Estado v1",
+  summary: "Resumen v1", description: "Descripción v1", features: ["Función v1"], tech: ["Tec v1"],
+  liveUrl: "https://v1.example/", appUrl: null, images: [{ url: "/portfolio/v1.webp", alt: "v1" }], sortOrder: 3,
+  variants: [baseVariant, { ...baseVariant, name: "Versión retirada", description: "Retirada" }],
+};
+const newSeed: SeedProject = {
+  ...oldSeed, title: "Título v2", client: "Cliente v2", category: "Categoría v2", status: "Estado v2",
+  summary: "Resumen v2", description: "Descripción v2", features: ["Función v2"], tech: ["Tec v2"],
+  liveUrl: "https://v2.example/", appUrl: "https://app.v2.example/", images: [{ url: "/portfolio/v2.webp", alt: "v2" }], sortOrder: 5,
+  variants: [
+    { ...baseVariant, client: "Cliente A2", summary: "Resumen A2", description: "Descripción A2", features: ["Función A2"], tech: ["Tec A2"], images: [{ url: "/portfolio/a2.webp", alt: "A2" }] },
+    { ...baseVariant, name: "Versión nueva", description: "Nueva" },
+  ],
+};
+
+describe("actualización de la semilla campo a campo (#133)", () => {
+  it("actualiza los campos por defecto y conserva por separado los editados", () => {
+    const row = {
+      ...seedDefaultsOf(oldSeed),
+      client: "Cliente editado", features: ["Función editada"], liveUrl: "https://editada.example/", status: "Estado editado",
+    };
+    const merged = mergeSeedProject(row, newSeed, seedDefaultsOf(oldSeed));
+    expect(merged).toMatchObject({
+      title: "Título v2", category: "Categoría v2", summary: "Resumen v2", description: "Descripción v2",
+      tech: ["Tec v2"], sortOrder: 5, images: newSeed.images, appUrl: "https://app.v2.example/",
+      client: "Cliente editado", features: ["Función editada"], liveUrl: "https://editada.example/", status: "Estado editado",
+    });
+  });
+
+  it("sin valores anteriores conocidos no pisa nada más que lo vacío", () => {
+    const row = { ...seedDefaultsOf(oldSeed), images: [], liveUrl: null };
+    const merged = mergeSeedProject(row, newSeed, null);
+    expect(merged).toEqual({ ...row, images: newSeed.images, liveUrl: newSeed.liveUrl, appUrl: newSeed.appUrl });
+  });
+
+  it("applySeed fusiona una fila con seed_defaults y guarda los nuevos valores por defecto", async () => {
+    const seed = SEED[0];
+    const defaults = { ...seedDefaultsOf(seed), category: "Categoría anterior", tech: ["Tec anterior"], client: "Cliente anterior" };
+    migrationState.meta = { seed_version: String(SEED_VERSION - 1) };
+    migrationState.deletedSlugs = new Set(SEED.slice(1).map(p => p.slug));
+    migrationState.writes = [];
+    migrationState.projects = [{
+      id: 1, slug: seed.slug, title: seed.title, client: "Cliente editado por admin", category: "Categoría anterior",
+      summary: seed.summary, description: seed.description, status: seed.status, features: ["Editada"], tech: ["Tec anterior"],
+      live_url: seed.liveUrl, app_url: seed.appUrl, images: seed.images, variants: seed.variants, sort_order: seed.sortOrder,
+      published: true, seed_defaults: defaults,
+    }];
+    await applySeed();
+    const row = migrationState.projects[0];
+    expect(row).toMatchObject({ client: "Cliente editado por admin", category: seed.category, tech: seed.tech, features: ["Editada"] });
+    expect(row.seed_defaults).toEqual(seedDefaultsOf(seed));
+  });
+});
+
+describe("variantes personalizadas durante la actualización de la semilla (#134)", () => {
+  it("actualiza los campos por defecto de una variante y conserva los personalizados y sus imágenes", () => {
+    const customImages = [{ url: "/api/media/propia", alt: "Imagen propia" }];
+    const custom = { ...baseVariant, name: "Variante creada en el panel" };
+    const current = [
+      { ...baseVariant, summary: "Resumen editado", images: customImages },
+      { ...baseVariant, name: "Versión retirada", description: "Retirada" },
+      custom,
+    ];
+    const merged = mergeSeedVariants(current, newSeed.variants, oldSeed.variants);
+    expect(merged).toEqual([
+      {
+        ...baseVariant, client: "Cliente A2", description: "Descripción A2", features: ["Función A2"], tech: ["Tec A2"],
+        summary: "Resumen editado", images: customImages,
+      },
+      custom,
+      newSeed.variants[1],
+    ]);
+  });
+
+  it("conserva una variante retirada de la semilla si se había editado y no recrea una borrada", () => {
+    const edited = { ...baseVariant, name: "Versión retirada", description: "Editada" };
+    const merged = mergeSeedVariants([edited], newSeed.variants, oldSeed.variants);
+    // «Versión A» estaba en la semilla anterior y ya no está en la fila: la borró el admin.
+    expect(merged).toEqual([edited, newSeed.variants[1]]);
+  });
+
+  it("sin variantes anteriores conocidas no toca las de la fila", () => {
+    const current = [{ ...baseVariant, summary: "Cualquiera" }];
+    expect(mergeSeedVariants(current, newSeed.variants, undefined)).toBe(current);
+  });
+});
+
+describe("borrados anteriores al registro (#139)", () => {
+  it("solo anota slugs confirmados de la semilla que no existen ahora", () => {
+    const existing = new Set([SEED[1].slug]);
+    expect(confirmedPreLedgerDeletions([SEED[0].slug, SEED[1].slug, "nunca-sembrado", SEED[0].slug], existing))
+      .toEqual([SEED[0].slug]);
+  });
+
+  it("el relleno registra el borrado confirmado y la semilla posterior no lo recrea", async () => {
+    migrationState.meta = { seed_version: String(SEED_VERSION - 1) };
+    migrationState.projects = [];
+    migrationState.deletedSlugs = new Set();
+    migrationState.writes = [];
+    await expect(backfillPreLedgerDeletions([SEED[2].slug, "proyecto-del-panel"])).resolves.toEqual([SEED[2].slug]);
+    expect([...migrationState.deletedSlugs]).toEqual([SEED[2].slug]);
+    await applySeed();
+    expect(migrationState.projects.some(p => p.slug === SEED[2].slug)).toBe(false);
+    expect(migrationState.projects.some(p => p.slug === SEED[3].slug)).toBe(true);
+  });
+
+  it("sin confirmación no anota nada", async () => {
+    migrationState.deletedSlugs = new Set();
+    migrationState.writes = [];
+    await expect(backfillPreLedgerDeletions([])).resolves.toEqual([]);
+    expect(migrationState.writes).toEqual([]);
+  });
+});
+
+describe("restaurar un proyecto borrado (#140)", () => {
+  it("restaura la copia guardada con su estado de publicación y quita la marca de borrado", async () => {
+    const seed = SEED[0];
+    migrationState.projects = [{
+      id: 9, slug: seed.slug, title: "Título editado", client: null, category: "Cat", summary: "", description: "",
+      status: "", features: [], tech: [], live_url: null, app_url: null, images: [{ url: "/api/media/x", alt: "x" }],
+      variants: [], sort_order: 2, published: false, seed_defaults: seedDefaultsOf(seed),
+    }];
+    migrationState.deletedSlugs = new Set();
+    migrationState.snapshots = new Map();
+    await deletePortfolioProject(9);
+    expect(migrationState.deletedSlugs.has(seed.slug)).toBe(true);
+
+    const restored = await restorePortfolioProject(seed.slug);
+    expect(restored).toMatchObject({ slug: seed.slug, title: "Título editado", published: false, images: [{ url: "/api/media/x", alt: "x" }] });
+    expect(migrationState.deletedSlugs.has(seed.slug)).toBe(false);
+    expect(migrationState.projects.find(p => p.slug === seed.slug)?.seed_defaults).toEqual(seedDefaultsOf(seed));
+  });
+
+  it("sin copia, recrea un proyecto de la semilla; uno ajeno a la semilla no es restaurable", async () => {
+    migrationState.projects = [];
+    migrationState.snapshots = new Map();
+    migrationState.deletedSlugs = new Set([SEED[1].slug, "proyecto-del-panel"]);
+    expect(await restorePortfolioProject(SEED[1].slug)).toMatchObject({ slug: SEED[1].slug, title: SEED[1].title, published: true });
+    expect(await restorePortfolioProject("proyecto-del-panel")).toBeNull();
+    expect(migrationState.deletedSlugs.has("proyecto-del-panel")).toBe(true);
+  });
+
+  it("no restaura si ya existe otro proyecto con ese slug", async () => {
+    migrationState.projects = [{ id: 1, slug: SEED[1].slug, title: "Nuevo" }];
+    migrationState.deletedSlugs = new Set([SEED[1].slug]);
+    expect(await restorePortfolioProject(SEED[1].slug)).toBeNull();
+    expect(migrationState.deletedSlugs.has(SEED[1].slug)).toBe(true);
+  });
 });

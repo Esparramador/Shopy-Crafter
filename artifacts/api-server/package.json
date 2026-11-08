@@ -7,8 +7,9 @@
     "dev": "export NODE_ENV=development && export NODE_TLS_REJECT_UNAUTHORIZED=0 && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps --max-old-space-size=1536 ./dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc -b ../../lib/db ../../lib/api-zod ../../lib/integrations-anthropic-ai ../../lib/integrations-gemini-ai && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "e2e:stripe-test-clock": "node scripts/stripe-test-clock-no-renewal.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

@@ -26,6 +26,15 @@
 //                     Al terminar se exige que GET /api/voice/convai/health muestre el
 //                     agente client en verde (status "ok") y se borra el usuario
 //                     (DELETE /api/admin/users/:id) comprobando que ya no está listado.
+//   E2E_VIEWPORT      p. ej. "375x812": repite la llamada real con ese viewport,
+//                     isMobile y hasTouch (cabecera del chat a ancho completo,
+//                     menú ⋯, botón 📞 de 32px, modal con maxHeight/scroll).
+//   E2E_MOBILE=1      atajo de E2E_VIEWPORT=375x812.
+//                     En viewport móvil se mide con getBoundingClientRect (helpers
+//                     de e2e/lib/layout.mjs) que, DURANTE la llamada, la tarjeta del
+//                     modal, el transcript y el botón "Colgar" quedan dentro del
+//                     viewport (y Colgar dentro de la tarjeta, sin quedar bajo el scroll).
+//                     Script: pnpm e2e:voice-call:client:mobile
 //
 // Es una llamada REAL (consume créditos ElevenLabs): se cuelga en cuanto Arturo
 // ha contestado a la frase inyectada.
@@ -42,6 +51,7 @@ import { execSync } from "node:child_process";
 import { mkdirSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { rectOf, inside, viewportRect, parseViewport } from "./lib/layout.mjs";
 
 const BASE = (process.env.E2E_BASE_URL || `https://${process.env.REPLIT_DEV_DOMAIN}`).replace(/\/$/, "");
 const EMAIL = process.env.E2E_ADMIN_EMAIL || "craftershopy@gmail.com";
@@ -51,6 +61,9 @@ const SHOTS = process.env.E2E_SCREENSHOT_DIR || "/tmp/convai-e2e";
 const MODE = process.env.E2E_MODE || "admin";
 if (MODE !== "admin" && MODE !== "client") fail(`E2E_MODE debe ser "admin" o "client" (recibido: ${MODE})`);
 const IS_CLIENT = MODE === "client";
+const VIEWPORT = parseViewport(process.env.E2E_VIEWPORT) ?? (process.env.E2E_MOBILE === "1" ? { width: 375, height: 812 } : null);
+if (process.env.E2E_VIEWPORT && !parseViewport(process.env.E2E_VIEWPORT)) fail(`E2E_VIEWPORT debe ser ANCHOxALTO, p. ej. 375x812 (recibido: ${process.env.E2E_VIEWPORT})`);
+const IS_MOBILE = !!VIEWPORT && VIEWPORT.width < 768;
 // Ruta que usa el modal según el modo (VoiceCallModal.tsx) y el texto del botón
 // de inicio: el modo cliente muestra "Consultar por voz" en vez de "Iniciar llamada".
 const CALL_URL_PATH = IS_CLIENT ? "/api/voice/client-call-url" : "/api/voice/convai/call-url";
@@ -105,7 +118,11 @@ let testClient = null;
 let clientAgentBefore = null;
 
 try {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    ...(VIEWPORT ? { viewport: VIEWPORT, isMobile: IS_MOBILE, hasTouch: IS_MOBILE } : {}),
+  });
+  if (VIEWPORT) console.log(`  viewport ${VIEWPORT.width}x${VIEWPORT.height}${IS_MOBILE ? " (móvil: isMobile + hasTouch)" : ""}`);
   await context.grantPermissions(["microphone"], { origin: BASE });
   const page = await context.newPage();
 
@@ -184,6 +201,8 @@ try {
     assert(login.ok() && loginBody.role === "client", `Login cliente ${testClient.email} → ${login.status()} role=${loginBody.role}`);
 
     await page.goto(`${BASE}/client`, { waitUntil: "domcontentloaded" });
+    // El banner de desarrollo de Replit tapa la cabecera del panel a ancho completo en móvil.
+    await page.addStyleTag({ content: "#replit-dev-banner{display:none!important}" }).catch(() => {});
     // FAB del chatbot del panel de cliente (ClientChatbot) → botón 📞 "Abrir consulta por voz".
     // El FAB "respira" con una animación CSS infinita: Playwright nunca lo ve estable.
     const fab = page.locator("button.cb-fab");
@@ -236,9 +255,30 @@ try {
   const heardUser = () => wsInfo.userTranscripts.find(t => PHRASE_PATTERN.test(t.text)) ?? null;
   const answeredAfter = (t) => t && wsInfo.agentResponses.some(a => a.at >= t.at) && wsInfo.audioAt.some(x => x >= t.at);
   let midCallShot = false;
+  // Medidas del modal DURANTE la llamada (modo móvil): transcript + Colgar visibles.
+  let layoutChecked = false;
+  const layoutFailures = [];
+  async function checkMobileLayout() {
+    const vp = viewportRect(page);
+    const card = await rectOf(page.getByTestId("voice-call-card"));
+    const hang = await rectOf(page.getByRole("button", { name: "Colgar" }));
+    const transcriptBox = await rectOf(page.getByTestId("voice-call-transcript"));
+    if (!inside(card, vp)) layoutFailures.push(`tarjeta fuera del viewport ${JSON.stringify(card)}`);
+    if (!inside(hang, vp)) layoutFailures.push(`"Colgar" fuera del viewport ${JSON.stringify(hang)}`);
+    if (!inside(hang, card)) layoutFailures.push(`"Colgar" oculto bajo el scroll de la tarjeta ${JSON.stringify(hang)}`);
+    if (!inside(transcriptBox, vp)) layoutFailures.push(`transcript fuera del viewport ${JSON.stringify(transcriptBox)}`);
+    console.log("  layout en llamada:", JSON.stringify({ viewport: vp, card, colgar: hang, transcript: transcriptBox }));
+  }
   while (Date.now() - started < CALL_TIMEOUT_MS) {
     await pollModal();
     if (!midCallShot && statesSeen.has("IA respondiendo")) { midCallShot = true; await page.screenshot({ path: `${SHOTS}/01-en-llamada.png` }); }
+    if (IS_MOBILE && !layoutChecked && heardUser()
+      && await page.getByTestId("voice-call-transcript").isVisible().catch(() => false)
+      && await page.getByRole("button", { name: "Colgar" }).isVisible().catch(() => false)) {
+      layoutChecked = true;
+      await checkMobileLayout();
+      await page.screenshot({ path: `${SHOTS}/04-movil-en-llamada.png` });
+    }
     if (answeredAfter(heardUser())) break;
     if (errorSeen.length) break;
     await sleep(200);
@@ -290,6 +330,10 @@ try {
   assert(!!reply, `El agente respondió tras entender al usuario${reply ? `: "${reply.text.slice(0, 100)}"` : ""}`);
   assert(heard ? wsInfo.audioAt.some(x => x >= heard.at) : false, "Llegó audio del agente después de la transcripción del usuario");
   assert(userBubble, 'El transcript del modal muestra la burbuja "Tú" con la frase');
+  if (IS_MOBILE) {
+    assert(layoutChecked, `Se midió el modal en ${VIEWPORT.width}px durante la llamada (transcript + Colgar visibles)`);
+    assert(layoutFailures.length === 0, `En ${VIEWPORT.width}px la tarjeta, el transcript y "Colgar" quedan dentro del viewport ${layoutFailures.length ? JSON.stringify(layoutFailures) : ""}`);
+  }
   assert(errorSeen.length === 0, `Sin mensajes de error en el modal ${errorSeen.length ? JSON.stringify(errorSeen) : ""}`);
   const convaiErrors = consoleErrors.filter(t => t.startsWith("ConvAI"));
   assert(convaiErrors.length === 0, `Sin console.error "ConvAI*" ${convaiErrors.length ? JSON.stringify(convaiErrors) : ""}`);

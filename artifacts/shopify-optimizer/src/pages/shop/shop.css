@@ -346,6 +346,9 @@
   .shop-nav-links { display: none; }
   .shop-cart-btn { margin-left: auto; }
   .shop-brand span { display: none; }
+  /* Cabecera en una sola línea hasta 320 px y con objetivos táctiles de 44 px. */
+  .shop-brand, .shop-nav-control, .shop-cart-btn { min-height: 44px; box-sizing: border-box; flex: none; }
+  .shop-brand { min-width: 44px; justify-content: center; }
   .shop-grid, .shop-ai-grid, .shop-faq-grid, .shop-steps { grid-template-columns: 1fr; }
   .shop-hero-facts { gap: 18px; }
   .shop-hero-stage { height: 300px; }

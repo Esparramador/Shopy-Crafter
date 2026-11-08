@@ -7,11 +7,23 @@
 //   3. Mover un slider habilita "Guardar y aplicar ahora"; el servidor persiste
 //      el valor y aplica/verifica los tres agentes existentes sin recrearlos.
 //   4. Se restauran los valores anteriores al terminar (siempre, también si falla).
+//   6. (#148) La voz guardada llega también al agente de CLIENTES: se guarda un
+//      ajuste distinto, un usuario cliente efímero (@e2e.invalid) pide
+//      /api/voice/client-call-url y se lee ese agente en
+//      /api/voice/convai/agents/:agentId (stability, similarity_boost, speed).
+//      El usuario se borra siempre al terminar.
+//   7. (#149) Solo si E2E_RESTART_CMD está definido: se guarda otro ajuste, se
+//      ejecuta ese comando para reiniciar el proceso API (p. ej. reiniciar el
+//      workflow), se espera a /api/healthz y la primera /api/voice/convai/call-url
+//      debe aplicar los valores persistidos al agente existente, conservando
+//      ELEVEN_CONVAI_DEFAULT_AGENT_ID si está fijado.
 //
 // Uso: ADMIN_PASSWORD=… node e2e/convai-voice-tuning.e2e.mjs
-// Env: ADMIN_PASSWORD (obligatoria), E2E_ADMIN_EMAIL, E2E_BASE_URL, E2E_CHROMIUM.
+// Env: ADMIN_PASSWORD (obligatoria), E2E_ADMIN_EMAIL, E2E_BASE_URL, E2E_CHROMIUM,
+//      E2E_RESTART_CMD (opcional, paso 7), E2E_RESTART_TIMEOUT_MS (por defecto 180000).
 
 import { chromium } from "playwright";
+import { nanoid } from "nanoid";
 import { execSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
@@ -36,6 +48,19 @@ const browser = await chromium.launch({ executablePath: chromiumPath(), headless
 const ctx = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1280, height: 900 } });
 let original = null;
 let exitCode = 0;
+let testClient = null;
+const closeEnough = (actual, expected) => Number.isFinite(Number(actual)) && Math.abs(Number(actual) - expected) < 0.005;
+const otherValue = (v, lo, hi) => Math.round((v + 0.1 <= hi ? v + 0.1 : v - 0.1) * 100) / 100;
+async function readAgentTts(agentId) {
+  const r = await ctx.request.get(`${BASE}/api/voice/convai/agents/${encodeURIComponent(agentId)}`);
+  if (!r.ok()) throw new Error(`GET /api/voice/convai/agents/${agentId} → ${r.status()}`);
+  return (await r.json()).agent?.conversation_config?.tts ?? {};
+}
+function assertTts(tts, expected, label) {
+  assert(closeEnough(tts.stability, expected.stability), `${label}: stability=${tts.stability} (esperado ${expected.stability})`);
+  assert(closeEnough(tts.similarity_boost, expected.similarityBoost), `${label}: similarity_boost=${tts.similarity_boost} (esperado ${expected.similarityBoost})`);
+  assert(closeEnough(tts.speed, expected.speed), `${label}: speed=${tts.speed} (esperado ${expected.speed})`);
+}
 try {
   const login = await ctx.request.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
   if (!login.ok()) fail(`Login admin ${EMAIL} → ${login.status()}`);
@@ -214,6 +239,63 @@ try {
   assert(closeEnough(persistedTts?.similarity_boost, callSettings.similarityBoost), `ElevenLabs conserva similarity_boost=${persistedTts?.similarity_boost} y no una configuración obsoleta`);
   assert(closeEnough(persistedTts?.speed, callSettings.speed), `ElevenLabs conserva speed=${persistedTts?.speed} y no una configuración obsoleta`);
 
+  // 6. (#148) La voz guardada llega al agente que atiende llamadas de clientes.
+  const clientSettings = {
+    stability: otherValue(original.stability, 0, 1),
+    similarityBoost: otherValue(original.similarityBoost, 0, 1),
+    speed: otherValue(original.speed, 0.7, 1.2),
+  };
+  const clientSave = await ctx.request.put(`${BASE}/api/voice/convai/voice-settings`, { data: clientSettings });
+  assert(clientSave.ok(), `Guardar un ajuste distinto para el agente de clientes → HTTP ${clientSave.status()}`);
+  const tag = nanoid(10);
+  testClient = { email: `e2e-voz-${tag.toLowerCase()}@e2e.invalid`, password: `E2e-${nanoid(18)}`, name: `E2E Voz ${tag}` };
+  const created = await ctx.request.post(`${BASE}/api/admin/users`, { data: { email: testClient.email, name: testClient.name, role: "client", password: testClient.password } });
+  const createdBody = await created.json().catch(() => ({}));
+  assert(created.ok() && createdBody.id, `Usuario cliente de prueba creado → HTTP ${created.status()}`);
+  testClient.id = createdBody.id;
+  const clientCtx = await browser.newContext({ ignoreHTTPSErrors: true });
+  try {
+    const clientLogin = await clientCtx.request.post(`${BASE}/api/auth/login`, { data: { email: testClient.email, password: testClient.password } });
+    assert(clientLogin.ok(), `Login del cliente de prueba → HTTP ${clientLogin.status()}`);
+    const clientCall = await clientCtx.request.get(`${BASE}/api/voice/client-call-url`);
+    assert(clientCall.status() === 200, `/api/voice/client-call-url → HTTP ${clientCall.status()}`);
+    const clientCallBody = await clientCall.json();
+    assert(clientCallBody.mode === "client" && typeof clientCallBody.agentId === "string", `La URL es del agente de clientes (${clientCallBody.agentId})`);
+    assertTts(await readAgentTts(clientCallBody.agentId), clientSettings, "Agente de clientes");
+  } finally {
+    await clientCtx.close();
+  }
+
+  // 7. (#149) Tras reiniciar el proceso API se aplican los valores persistidos.
+  if (process.env.E2E_RESTART_CMD) {
+    const restartSettings = { ...clientSettings, speed: otherValue(clientSettings.speed, 0.7, 1.2) };
+    const restartSave = await ctx.request.put(`${BASE}/api/voice/convai/voice-settings`, { data: restartSettings });
+    assert(restartSave.ok(), `Guardar el ajuste previo al reinicio → HTTP ${restartSave.status()}`);
+    console.log(`  reiniciando la API: ${process.env.E2E_RESTART_CMD}`);
+    execSync(process.env.E2E_RESTART_CMD, { stdio: "inherit" });
+    const deadline = Date.now() + Number(process.env.E2E_RESTART_TIMEOUT_MS || 180_000);
+    await new Promise(resolve => setTimeout(resolve, 3_000));
+    for (;;) {
+      const h = await ctx.request.get(`${BASE}/api/healthz`).catch(() => null);
+      if (h?.ok()) break;
+      if (Date.now() > deadline) throw new Error("La API no volvió tras el reinicio");
+      await new Promise(resolve => setTimeout(resolve, 2_000));
+    }
+    ok("La API respondió de nuevo tras el reinicio");
+    // La sesión está en Postgres: si se perdió, se vuelve a entrar.
+    if ((await ctx.request.get(`${BASE}/api/voice/convai/voice-settings`)).status() === 401) {
+      await ctx.request.post(`${BASE}/api/auth/login`, { data: { email: EMAIL, password: PASSWORD } });
+    }
+    const afterRestart = await ctx.request.get(`${BASE}/api/voice/convai/call-url`);
+    assert(afterRestart.status() === 200, `Primera call-url tras el reinicio → HTTP ${afterRestart.status()}`);
+    const afterRestartBody = await afterRestart.json();
+    const pinned = process.env.ELEVEN_CONVAI_DEFAULT_AGENT_ID?.trim();
+    if (pinned) assert(afterRestartBody.agentId === pinned, "Tras el reinicio se conserva ELEVEN_CONVAI_DEFAULT_AGENT_ID");
+    assertTts(await readAgentTts(afterRestartBody.agentId), restartSettings, "Agente admin tras reinicio");
+  } else {
+    console.log("(E2E_RESTART_CMD no definido: paso 7 de reinicio omitido; cubierto por voice-settings-lifecycle.test.ts con BD simulada)");
+  }
+
   await page.waitForTimeout(500);
   await card.screenshot({ path: path.join(OUT, "02-saved.png") });
 
@@ -223,6 +305,15 @@ try {
   exitCode = 1;
   console.error(`✗ ${err?.message || err}`);
 } finally {
+  if (testClient?.id) {
+    const del = await ctx.request.delete(`${BASE}/api/admin/users/${testClient.id}`).catch(() => null);
+    if (del?.ok()) console.log(`✓ Usuario de prueba ${testClient.email} borrado`);
+    else {
+      const r = await ctx.request.post(`${BASE}/api/admin/users/${testClient.id}/deactivate`).catch(() => null);
+      console.log(`✗ No se pudo borrar el usuario de prueba (desactivado → ${r?.status()})`);
+      exitCode = 1;
+    }
+  }
   // 4. Restaurar siempre los valores anteriores y aplicarlos en sitio.
   if (original) {
     const restore = await ctx.request.put(`${BASE}/api/voice/convai/voice-settings`, { data: original });

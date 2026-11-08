@@ -5,9 +5,10 @@
 // son gratuitos y devuelven 200 si la API key es válida y la cuenta está activa.
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai" | "freepik" | "openai" | "nvidia";
+export type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai" | "freepik" | "openai" | "nvidia" | "convai";
 
-export type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
+// "degraded" (ámbar) solo lo usa "convai": config desactualizada que la próxima llamada repara.
+export type ProviderStatus = "ok" | "degraded" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
 
 export interface ProviderHealth {
   provider: ProviderId;
@@ -251,16 +252,66 @@ async function checkNvidia(): Promise<ProviderHealth> {
   }
 }
 
+// ── Llamadas de voz (ElevenLabs ConvAI): ¿podría hablar Arturo ahora mismo? ──
+// Reutiliza la comprobación de GET /api/voice/convai/health (solo lectura: 1
+// consulta de la voz + 1 GET por agente; nunca PATCH ni creación). Va dentro del
+// caché de 60 s de esta barra.
+type ConvAIHealthLike = {
+  healthy: boolean;
+  degraded: boolean;
+  voice: { ok: boolean; error?: string };
+  agents: Array<{ type: string; status: string; error?: string }>;
+};
+const AGENT_LABEL: Record<string, string> = { admin: "admin", client: "cliente", landing: "landing" };
+const CONVAI_CHECK_TIMEOUT_MS = 20_000;
+
+/** Traduce el informe de salud ConvAI al estado verde/ámbar/rojo de la barra. */
+export function convaiHealthToProvider(report: ConvAIHealthLike, checkedAt = Date.now()): ProviderHealth {
+  if (report.healthy) {
+    const created = report.agents.filter(a => a.status === "ok").length;
+    return { provider: "convai", status: "ok", hasKey: true, detail: `${created}/${report.agents.length} agentes verificados`, checkedAt };
+  }
+  if (!report.voice.ok) {
+    return { provider: "convai", status: "down", hasKey: true, detail: `voz rechazada: ${report.voice.error ?? "desconocido"}`, checkedAt };
+  }
+  const failing = report.agents.filter(a => a.status === "error");
+  if (failing.length) {
+    const detail = failing.map(a => `${AGENT_LABEL[a.type] ?? a.type}: ${a.error ?? "error"}`).join(" · ");
+    return { provider: "convai", status: "down", hasKey: true, detail, checkedAt };
+  }
+  const drift = report.agents.filter(a => a.status === "drift").map(a => AGENT_LABEL[a.type] ?? a.type);
+  return { provider: "convai", status: "degraded", hasKey: true, detail: `config desactualizada (${drift.join(", ")}); se corrige en la próxima llamada`, checkedAt };
+}
+
+async function checkConvAI(): Promise<ProviderHealth> {
+  const checkedAt = Date.now();
+  if (!process.env.ELEVENLABS_API_KEY) return { provider: "convai", status: "missing_key", hasKey: false, checkedAt };
+  try {
+    const { checkConvAIHealth } = await import("../routes/voice.js");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("timeout comprobando ConvAI")), CONVAI_CHECK_TIMEOUT_MS);
+    });
+    try {
+      return convaiHealthToProvider(await Promise.race([checkConvAIHealth(), timeout]), checkedAt);
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (e: any) {
+    return { provider: "convai", status: "unknown", hasKey: true, detail: e?.message || "error comprobando ConvAI", checkedAt };
+  }
+}
+
 // ── Cache 60s para evitar machacar las APIs en cada render del frontend.
 let _cache: { ts: number; data: Record<ProviderId, ProviderHealth> } | null = null;
 const CACHE_TTL_MS = 60_000;
 
 export async function getAllProvidersHealth(forceFresh = false): Promise<Record<ProviderId, ProviderHealth>> {
   if (!forceFresh && _cache && Date.now() - _cache.ts < CACHE_TTL_MS) return _cache.data;
-  const [replicate, runway, gemini, elevenlabs, xai, freepik, openai, nvidia] = await Promise.all([
-    checkReplicate(), checkRunway(), checkGemini(), checkElevenLabs(), checkXai(), checkFreepik(), checkOpenaiHealth(), checkNvidia(),
+  const [replicate, runway, gemini, elevenlabs, xai, freepik, openai, nvidia, convai] = await Promise.all([
+    checkReplicate(), checkRunway(), checkGemini(), checkElevenLabs(), checkXai(), checkFreepik(), checkOpenai(), checkNvidia(), checkConvAI(),
   ]);
-  const data: Record<ProviderId, ProviderHealth> = { replicate, runway, gemini, elevenlabs, xai, freepik, openai, nvidia };
+  const data: Record<ProviderId, ProviderHealth> = { replicate, runway, gemini, elevenlabs, xai, freepik, openai, nvidia, convai };
   _cache = { ts: Date.now(), data };
   return data;
 }

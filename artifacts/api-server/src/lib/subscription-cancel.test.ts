@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = Record<string, unknown>;
 let selectRows: Record<string, Row[]> = {};
@@ -23,13 +23,25 @@ vi.mock("@workspace/db", () => {
 });
 vi.mock("drizzle-orm", () => ({ eq: (a: unknown, b: unknown) => ({ eq: [a, b] }) }));
 vi.mock("./logger.js", () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
-vi.mock("stripe", () => ({ default: class { subscriptions = { retrieve: async () => { throw new Error("no debería llamarse en tests"); }, cancel: async () => { throw new Error("no debería llamarse en tests"); }, update: async () => { throw new Error("no debería llamarse en tests"); } }; } }));
+// El SDK nunca llega a la red: registra con qué clave se construyó y responde resource_missing,
+// que la cancelación trata fallando cerrada (409) sin tocar nada.
+const stripeKeysUsed = vi.hoisted(() => [] as string[]);
+vi.mock("stripe", () => ({
+  default: class {
+    constructor(key: string) { stripeKeysUsed.push(key); }
+    subscriptions = {
+      retrieve: async () => { throw Object.assign(new Error("No such subscription (mock)"), { code: "resource_missing" }); },
+      cancel: async () => { throw new Error("no debería llamarse en tests"); },
+      update: async () => { throw new Error("no debería llamarse en tests"); },
+    };
+  },
+}));
 vi.mock("./user-deletion.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./user-deletion.js")>();
   return { ...actual, deleteClientUser: deleteClientUserMock };
 });
 
-import { cancelClientSubscription, isStripeAlreadyCanceledError, syncLocalSubscriptionFromStripeEvent } from "./subscription-cancel";
+import { cancelClientSubscription, isStripeAlreadyCanceledError, selectStripeKeyForCancellation, syncLocalSubscriptionFromStripeEvent } from "./subscription-cancel";
 import { deleteClientUser } from "./user-deletion";
 import { stripeSubscriptionDashboardUrl } from "./stripe-dashboard-url";
 
@@ -40,6 +52,7 @@ beforeEach(() => {
   selectRows = {};
   updates.length = 0;
   wheres.length = 0;
+  stripeKeysUsed.length = 0;
   deleteClientUserMock.mockReset().mockResolvedValue({ ok: true, deleted: { id: "c1", email: "c1@example.com" } });
 });
 
@@ -372,5 +385,73 @@ describe("syncLocalSubscriptionFromStripeEvent (webhook customer.subscription.*)
     expect(await syncLocalSubscriptionFromStripeEvent({ stripeSubscriptionId: "", status: "canceled", deleted: true })).toEqual({ applied: false, reason: "no_id" });
     expect(await syncLocalSubscriptionFromStripeEvent({ stripeSubscriptionId: undefined, status: "canceled", deleted: true })).toEqual({ applied: false, reason: "no_id" });
     expect(updates).toEqual([]);
+  });
+});
+
+describe("clave de Stripe para cancelar: la clave E2E solo para la suscripción de prueba (#113)", () => {
+  const LIVE = "sk_live_platform";
+  const TEST = "sk_test_e2e";
+  const env = (extra: Record<string, string | undefined>) => ({ STRIPE_SECRET_KEY: LIVE, ...extra }) as NodeJS.ProcessEnv;
+
+  it("un cliente normal usa STRIPE_SECRET_KEY aunque exista E2E_STRIPE_SECRET_KEY en desarrollo", () => {
+    expect(selectStripeKeyForCancellation("ana@tienda.es", env({ NODE_ENV: "development", E2E_STRIPE_SECRET_KEY: TEST })))
+      .toEqual({ source: "default", key: LIVE });
+  });
+
+  it("el cliente desechable del E2E (@e2e.invalid) usa la clave de test fuera de producción", () => {
+    expect(selectStripeKeyForCancellation("e2e-del-stripe-period-end-x@e2e.invalid", env({ NODE_ENV: "development", E2E_STRIPE_SECRET_KEY: TEST })))
+      .toEqual({ source: "e2e", key: TEST });
+  });
+
+  it("en producción la clave E2E se ignora siempre, también para @e2e.invalid", () => {
+    expect(selectStripeKeyForCancellation("x@e2e.invalid", env({ NODE_ENV: "production", E2E_STRIPE_SECRET_KEY: TEST })))
+      .toEqual({ source: "default", key: LIVE });
+  });
+
+  it("sin clave E2E el cliente de prueba usa la normal; con una clave E2E que no es de test, ninguna", () => {
+    expect(selectStripeKeyForCancellation("x@e2e.invalid", env({ NODE_ENV: "development" }))).toEqual({ source: "default", key: LIVE });
+    expect(selectStripeKeyForCancellation("x@e2e.invalid", env({ NODE_ENV: "development", E2E_STRIPE_SECRET_KEY: "sk_live_oops" })))
+      .toMatchObject({ source: "e2e_invalid", key: null });
+    // Una clave E2E mal puesta ya no rompe las cancelaciones normales (antes lanzaba para todos).
+    expect(selectStripeKeyForCancellation("ana@tienda.es", env({ NODE_ENV: "development", E2E_STRIPE_SECRET_KEY: "sk_live_oops" })))
+      .toEqual({ source: "default", key: LIVE });
+  });
+
+  describe("cancelClientSubscription sin cliente inyectado elige la clave por usuario", () => {
+    const saved = { ...process.env };
+    beforeEach(() => {
+      process.env.NODE_ENV = "development";
+      process.env.STRIPE_SECRET_KEY = LIVE;
+      process.env.E2E_STRIPE_SECRET_KEY = TEST;
+    });
+    afterEach(() => {
+      for (const k of ["NODE_ENV", "STRIPE_SECRET_KEY", "E2E_STRIPE_SECRET_KEY"]) {
+        if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k];
+      }
+    });
+
+    it("cancelación normal del admin → SDK construido con STRIPE_SECRET_KEY", async () => {
+      selectRows = { users: [{ ...client, email: "ana@tienda.es" }], subscriptions: [activeSub] };
+      const r = await cancelClientSubscription("c1", "a1");
+      expect(stripeKeysUsed).toEqual([LIVE]);
+      expect(r).toMatchObject({ ok: false, status: 409, stripeDashboardUrl: "https://dashboard.stripe.com/subscriptions/sub_live" });
+      expect(updates).toEqual([]);
+    });
+
+    it("suscripción de prueba del E2E → SDK construido con E2E_STRIPE_SECRET_KEY y enlace al dashboard de test", async () => {
+      selectRows = { users: [{ ...client, email: "e2e-del-x@e2e.invalid" }], subscriptions: [activeSub] };
+      const r = await cancelClientSubscription("c1", "a1", undefined, AT_END);
+      expect(stripeKeysUsed).toEqual([TEST]);
+      expect(r).toMatchObject({ ok: false, status: 409, stripeDashboardUrl: "https://dashboard.stripe.com/test/subscriptions/sub_live" });
+      expect(updates).toEqual([]);
+    });
+
+    it("E2E_STRIPE_SECRET_KEY que no es sk_test_ → 503 para el cliente de prueba sin construir ningún SDK", async () => {
+      process.env.E2E_STRIPE_SECRET_KEY = "sk_live_oops";
+      selectRows = { users: [{ ...client, email: "e2e-del-x@e2e.invalid" }], subscriptions: [activeSub] };
+      expect(await cancelClientSubscription("c1", "a1")).toMatchObject({ ok: false, status: 503 });
+      expect(stripeKeysUsed).toEqual([]);
+      expect(updates).toEqual([]);
+    });
   });
 });

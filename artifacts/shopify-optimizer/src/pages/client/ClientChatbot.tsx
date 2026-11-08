@@ -97,7 +97,12 @@ const SR_API: any = typeof window !== "undefined"
   ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
   : null;
 
-export function ClientChatbot() {
+/** Atributo de <body> mientras el chat del cliente está abierto: design-system.css
+ *  oculta con él los .floating-widget (panel Setup, botón de voz…) para que no
+ *  tapen el panel del chat (tarea #95). */
+export const CLIENT_CHAT_OPEN_ATTR = "data-client-chat-open";
+
+export function ClientChatbot({ onOpenChange }: { onOpenChange?: (open: boolean) => void } = {}) {
   // Previsualización del admin: mismo ?pid que el resto del portal (antes todas
   // las llamadas daban 400 "No project linked" en la vista previa).
   const { user } = useAuth();
@@ -162,6 +167,11 @@ export function ClientChatbot() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, loading]);
   useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 120); }, [open]);
+  useEffect(() => {
+    document.body.toggleAttribute(CLIENT_CHAT_OPEN_ATTR, open);
+    onOpenChange?.(open);
+    return () => { document.body.removeAttribute(CLIENT_CHAT_OPEN_ATTR); };
+  }, [open, onOpenChange]);
 
   const speak = useCallback((text: string) => {
     if (!voiceOn || !window.speechSynthesis) return;

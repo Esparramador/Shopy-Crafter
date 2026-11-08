@@ -72,6 +72,6 @@ a.pp-card { text-decoration: none; color: inherit; display: block; } a.pp-card:h
 .pp-footer-in { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(220px, 1fr) 3fr; gap: 36px; }
 .pp-footer-brand p { margin: 14px 0 0; max-width: 300px; font-size: 13px; line-height: 1.6; color: var(--pp-muted); }
 .pp-footer-bar { max-width: 1180px; margin: 36px auto 0; padding-top: 18px; border-top: 1px solid var(--pp-line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--pp-muted); } .pp-footer-bar a { color: var(--pp-muted); text-decoration: none; }
-@media (max-width: 760px) { .pp-footer-in { grid-template-columns: 1fr; } .pp-nav-in { gap: 12px; } }
+@media (max-width: 760px) { .pp-footer-in { grid-template-columns: 1fr; } .pp-nav-in { gap: 12px; padding: 0 16px; } .pp-nav .pp-brand { min-height: 44px; white-space: nowrap; } .pp-burger { width: 44px; height: 44px; flex: none; } }
 .pp-shell a:focus-visible, .pp-shell button:focus-visible { outline: 2px solid var(--pp-gold2); outline-offset: 3px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) { .pp-btn, .pp-card, .pp-login { transition: none; } }

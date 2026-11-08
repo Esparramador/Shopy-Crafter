@@ -11,6 +11,8 @@ import {
   type ContactLeadData,
   type ContactSubmissionRecord,
 } from "../lib/contact-idempotency.js";
+import { createContactRateLimiter } from "../lib/contact-rate-limit.js";
+import { PgRateLimitStore } from "../lib/pg-rate-limit-store.js";
 import { PostgresContactPrereportStore } from "../lib/contact-prereport-store.js";
 import { startContactPrereportWorker as startWorker } from "../lib/contact-prereport-worker.js";
 import multer from "multer";
@@ -40,18 +42,10 @@ function safeErrorCode(error: unknown): string {
   return /^[A-Za-z][A-Za-z0-9]{0,59}$/.test(name) ? name : "UnknownError";
 }
 
-const contactRateMap = new Map<string, { count: number; resetAt: number }>();
-function checkContactRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = contactRateMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    contactRateMap.set(ip, { count: 1, resetAt: now + 3600_000 });
-    return true;
-  }
-  if (entry.count >= 5) return false;
-  entry.count++;
-  return true;
-}
+// 5 solicitudes nuevas por IP y hora, en Postgres (persiste y se comparte entre
+// instancias). Solo se consulta para solicitudes nuevas: los reintentos con la
+// misma Idempotency-Key no gastan cupo.
+const checkContactRateLimit = createContactRateLimiter(new PgRateLimitStore("contact"));
 
 type LeadData = ContactLeadData;
 

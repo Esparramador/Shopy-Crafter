@@ -4,8 +4,10 @@ description: Verified live model IDs for all AI providers — deep 20-search par
 ---
 
 ## Runway (api.dev.runwayml.com/v1, header 2024-11-06)
-- Gen4.5 `/image_to_video` API model ID: `gen4.5` (dot); the internal selector `gen4_5` must be mapped to it. The live official schema confirms the dotted ID.
-- Gen4.5-Turbo: `gen4_5_turbo`
+- Gen4.5 API model ID: `gen4.5` (DOT) — corrected 2026-11-07 from the official list at
+  docs.dev.runwayml.com/guides/models. The old note here (`gen4_5`) was wrong. In code,
+  `gen4_5` survives only as an internal key in lib/runway.ts and is mapped to `gen4.5`.
+- Gen4.5-Turbo: does NOT exist in the official list (no `gen4_5_turbo`) — send `gen4.5`
 - Aleph 2.0: `aleph2` — V2V only (video-to-video edit), NOT T2V/I2V
 - HappyHorse 1.0: `happyhorse_1_0` — T2V+I2V
 - Gen4 Turbo: `gen4_turbo`; Gen3: `gen3a_turbo`
@@ -38,8 +40,16 @@ description: Verified live model IDs for all AI providers — deep 20-search par
 
 ## xAI Grok Video
 - `grok-imagine-video` — T2V+I2V+Reference+Edit+Extend, 720p
-- `grok-imagine-video-1.5` — T2V+I2V, 1080p (no Reference mode)
-- NO `-preview` suffix; endpoint: POST /v1/videos/generations
+- `grok-imagine-video-1.5` — T2V+I2V, 1080p (no Reference mode); official aliases
+  `grok-imagine-video-1.5-preview` and `grok-imagine-video-1.5-2026-05-30` (docs.x.ai, 2026-11-07)
+- `grok-imagine-video-1.5-lite` also exists. `grok-video-1` does NOT exist.
+- endpoint: POST /v1/videos/generations
+
+## xAI Grok text (docs.x.ai, 2026-11-07)
+- Current: grok-4.7, grok-4.6, grok-4.5, grok-4.3 (text+image, 1M ctx), grok-4.20-0309-(non-)reasoning, grok-build-0.1
+- grok-3 retired 2026-05-15 → redirected to grok-4.3 (docs.x.ai/developers/migration/may-15-retirement)
+- grok-3-mini / -fast / -mini-fast, grok-2-vision-1212, grok-vision-beta: NOT in the official list;
+  confirm with key via GET /api/admin/ai-models/xai-live
 
 ## Tripo3D
 - Full version strings required: `v3.1-20260211`, `P1-20260311`, `v2.5-20250123`

@@ -8,8 +8,9 @@ const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 
 type Tab = "generate" | "edit" | "background" | "enhance" | "video" | "multishot" | "uploadconcat" | "avatars" | "audio" | "audiotools" | "compose" | "protools" | "promptlab" | "cinematic-templates" | "openart" | "downloads";
 
-type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai" | "freepik" | "openai" | "nvidia";
-type ProviderStatus = "ok" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
+// "convai" = llamadas de voz de Arturo (salud ConvAI), no una API de generación.
+type ProviderId = "replicate" | "runway" | "gemini" | "elevenlabs" | "xai" | "freepik" | "openai" | "nvidia" | "convai";
+type ProviderStatus = "ok" | "degraded" | "missing_key" | "out_of_credits" | "rate_limited" | "down" | "unknown";
 interface ProviderHealth { provider: ProviderId; status: ProviderStatus; hasKey: boolean; detail?: string; checkedAt: number }
 type HealthMap = Record<ProviderId, ProviderHealth>;
 
@@ -56,10 +57,11 @@ function useProviderHealth(): { health: HealthMap | null; loading: boolean; refr
 }
 
 const PROVIDER_LABEL: Record<ProviderId, string> = {
-  replicate: "Replicate", runway: "Runway", gemini: "Gemini", elevenlabs: "ElevenLabs", xai: "xAI (Grok)", freepik: "Freepik", openai: "OpenAI", nvidia: "NVIDIA NIM",
+  replicate: "Replicate", runway: "Runway", gemini: "Gemini", elevenlabs: "ElevenLabs", xai: "xAI (Grok)", freepik: "Freepik", openai: "OpenAI", nvidia: "NVIDIA NIM", convai: "Voz llamadas",
 };
 const STATUS_COLOR: Record<ProviderStatus, { bg: string; fg: string; border: string; emoji: string }> = {
   ok:              { bg: "rgba(45,212,159,0.15)", fg: "#2dd49f", border: "rgba(45,212,159,0.4)", emoji: "🟢" },
+  degraded:        { bg: "rgba(245,158,11,0.15)", fg: "#f59e0b", border: "rgba(245,158,11,0.4)", emoji: "🟠" },
   rate_limited:    { bg: "rgba(251,191,36,0.15)", fg: "#fbbf24", border: "rgba(251,191,36,0.4)", emoji: "🟡" },
   out_of_credits:  { bg: "rgba(239,68,68,0.15)",  fg: "#ef4444", border: "rgba(239,68,68,0.4)",  emoji: "🔴" },
   missing_key:     { bg: "rgba(148,163,184,0.15)",fg: "#94a3b8", border: "rgba(148,163,184,0.4)",emoji: "⚪" },
@@ -68,6 +70,7 @@ const STATUS_COLOR: Record<ProviderStatus, { bg: string; fg: string; border: str
 };
 function statusLabel(s: ProviderStatus): string {
   return s === "ok" ? "operativo"
+    : s === "degraded" ? "config desactualizada"
     : s === "rate_limited" ? "rate limit"
     : s === "out_of_credits" ? "sin saldo (402)"
     : s === "missing_key" ? "sin API key"
@@ -247,8 +250,8 @@ export default function FusionStudioPro({ projectId: projectIdProp }: FusionStud
         <span style={{ fontSize: 11, fontWeight: 700, color: "var(--t3, #6c6c7c)", textTransform: "uppercase", letterSpacing: 0.6, marginRight: 6 }}>
           Motores IA
         </span>
-        {(["replicate","runway","gemini","elevenlabs","xai","freepik","openai","nvidia"] as ProviderId[]).map(p => (
-          <ProviderBadge key={p} provider={p} health={health} />
+        {(["replicate","runway","gemini","elevenlabs","xai","freepik","openai","nvidia","convai"] as ProviderId[]).map(p => (
+          <span key={p} data-testid={`provider-badge-${p}`}><ProviderBadge provider={p} health={health} /></span>
         ))}
         <button onClick={() => refreshHealth(true)} disabled={healthLoading}
           title="Refrescar estado (sin cache)"
@@ -1579,7 +1582,7 @@ function VideoTab({ caps, health, projectId, onSuccess, onError, onCreditError }
             <div style={{ marginTop: 8 }}>
               {[
                 { key: "grok-imagine-video", label: "Grok Imagine Video", desc: "Estándar — 720p, hasta 15s, $0.07/s" },
-                { key: "grok-imagine-video-1.5-preview", label: "Grok Imagine Video 1.5 Preview", desc: "Mayor calidad — 720p, hasta 15s, $0.14/s" },
+                { key: "grok-imagine-video-1.5", label: "Grok Imagine Video 1.5", desc: "Mayor calidad — 720p, hasta 15s, $0.14/s" },
               ].map(m => (
                 <button key={m.key} onClick={() => setXaiModel(m.key)} style={{ ...cardButton(xaiModel === m.key), display: "block", width: "100%", textAlign: "left", marginBottom: 6 }}>
                   <strong style={{ fontSize: 12 }}>{m.label}</strong>
@@ -2292,6 +2295,47 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
 
   useEffect(() => { if (sub === "convai" && !convaiLoaded) loadAgents(); }, [sub]);
 
+  // ── Agentes huérfanos / duplicados (#88): vista previa + borrado confirmado ──
+  type AgentAuditEntry = { agentId: string; name: string; createdAt: string | null; references: string[]; status: "in_use" | "orphan" | "custom" };
+  const [agentAudit, setAgentAudit] = useState<{ agents: AgentAuditEntry[]; duplicateNames: { name: string; count: number }[] } | null>(null);
+  const [agentAuditBusy, setAgentAuditBusy] = useState(false);
+  const [orphanSelection, setOrphanSelection] = useState<string[]>([]);
+
+  async function loadAgentAudit() {
+    setAgentAuditBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/convai/orphans`, { credentials: "include" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Error revisando los agentes");
+      setAgentAudit({ agents: j.agents ?? [], duplicateNames: j.duplicateNames ?? [] });
+      setOrphanSelection(j.orphanIds ?? []);
+    } catch (e: any) { onError(e.message); }
+    finally { setAgentAuditBusy(false); }
+  }
+
+  async function deleteSelectedOrphans() {
+    if (!orphanSelection.length) return;
+    const names = (agentAudit?.agents ?? []).filter(a => orphanSelection.includes(a.agentId)).map(a => `• ${a.name} (${a.agentId})`).join("\n");
+    if (!window.confirm(`Se borrarán de ElevenLabs estos ${orphanSelection.length} agentes huérfanos. No se puede deshacer.\n\n${names}`)) return;
+    setAgentAuditBusy(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/voice/convai/orphans/delete`, {
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentIds: orphanSelection, confirm: true }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 409) throw new Error(`${j.error} (${(j.refused ?? []).map((x: { agentId: string; reason: string }) => `${x.agentId}: ${x.reason}`).join(", ")})`);
+      if (!r.ok && !j.results) throw new Error(j.error || "Error borrando agentes huérfanos");
+      const deleted = (j.results ?? []).filter((x: { status: string }) => x.status === "deleted").length;
+      if (j.success) onInfo(`${deleted} agentes huérfanos borrados`);
+      else onError(`Borrados ${deleted}; algunos fallaron: ${(j.results ?? []).filter((x: { status: string }) => x.status === "error").map((x: { agentId: string; error?: string }) => `${x.agentId} ${x.error ?? ""}`).join(", ")}`);
+    } catch (e: any) { onError(e.message); }
+    finally {
+      setAgentAuditBusy(false);
+      await Promise.all([loadAgentAudit(), loadAgents()]);
+    }
+  }
+
   // ── Salud de las llamadas de voz (Arturo): voz + agentes admin/client/landing ──
   type ConvAIHealth = {
     healthy: boolean; degraded: boolean; checkedAt: string;
@@ -2360,11 +2404,21 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
     agentId: string | null;
     status: "applied" | "not_created" | "error";
     error?: string;
+    at?: string;
   };
+  type VoiceApplyReport = { settingsVersion: string; updatedAt: string; updatedBy: string; agents: Partial<Record<VoiceAgentType, VoiceApplyResult>> };
   type VoiceTuningInfo = {
     settings: VoiceTuning; source: "db" | "default" | "mixed"; invalid: (keyof VoiceTuning)[];
     defaults: VoiceTuning; limits: Record<keyof VoiceTuning, { min: number; max: number; step: number }>;
     voiceId: string; modelId: string; previewText: string; history: VoiceTuningHistory[];
+    /** Versión de lo guardado: se reenvía al guardar para detectar a otro admin (409). */
+    version?: string;
+    /** Último informe de "aplicar" para ESTA versión (sobrevive a recargar el panel). */
+    lastApply?: VoiceApplyReport | null;
+  };
+  type VoiceTuningConflict = {
+    attempted: VoiceTuning; applyNow: boolean; successMessage: string;
+    current: { settings?: VoiceTuning; version: string; lastChange?: VoiceTuningHistory | null };
   };
   const [tuningInfo, setTuningInfo] = useState<VoiceTuningInfo | null>(null);
   const [tuning, setTuning] = useState<VoiceTuning | null>(null);
@@ -2376,6 +2430,12 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
   const [tuningSavedAt, setTuningSavedAt] = useState<number | null>(null);
   const [tuningApplied, setTuningApplied] = useState(false);
   const [tuningApplyResults, setTuningApplyResults] = useState<Partial<Record<VoiceAgentType, VoiceApplyResult>>>({});
+  const [tuningApplyReportAt, setTuningApplyReportAt] = useState<string | null>(null);
+  const [tuningConflict, setTuningConflict] = useState<VoiceTuningConflict | null>(null);
+  // Historial completo (#144): la tarjeta muestra 5; esto pagina el resto.
+  const [fullHistory, setFullHistory] = useState<VoiceTuningHistory[] | null>(null);
+  const [fullHistoryCursor, setFullHistoryCursor] = useState<string | null>(null);
+  const [fullHistoryBusy, setFullHistoryBusy] = useState(false);
   const tuningAudioRef = useRef<HTMLAudioElement | null>(null);
   const tuningAudioUrlRef = useRef<string | null>(null);
 
@@ -2392,8 +2452,32 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "Error cargando los ajustes de voz");
       setTuningInfo(j); setTuning(j.settings);
+      setTuningConflict(null);
+      restoreApplyReport(j.lastApply ?? null);
     } catch (e: any) { setTuningErr(e.message); }
     finally { setTuningBusy(false); }
+  }
+
+  function restoreApplyReport(report: VoiceApplyReport | null) {
+    const agents = report?.agents ?? {};
+    setTuningApplyResults(agents);
+    setTuningApplyReportAt(report?.updatedAt ?? null);
+    const results = Object.values(agents) as VoiceApplyResult[];
+    setTuningApplied(results.length > 0 && results.every(result => result.status !== "error"));
+  }
+
+  async function loadFullHistory(more = false) {
+    setFullHistoryBusy(true);
+    try {
+      const qs = new URLSearchParams({ limit: "20" });
+      if (more && fullHistoryCursor) qs.set("before", fullHistoryCursor);
+      const r = await fetch(`${API_BASE}/api/voice/convai/voice-settings/history?${qs}`, { credentials: "include" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Error cargando el historial de la voz");
+      setFullHistory(previous => more && previous ? [...previous, ...j.entries] : j.entries);
+      setFullHistoryCursor(j.nextCursor ?? null);
+    } catch (e: any) { setTuningErr(e.message); }
+    finally { setFullHistoryBusy(false); }
   }
 
   async function previewTuning() {
@@ -2427,7 +2511,11 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
         body: agentTypes ? JSON.stringify({ agentTypes }) : undefined,
       });
       const j = await r.json().catch(() => ({}));
-      if (j.agents && typeof j.agents === "object") {
+      if (j.report?.agents) {
+        // El servidor ya fusionó el reintento con el informe guardado de esta versión.
+        setTuningApplyResults(j.report.agents);
+        setTuningApplyReportAt(j.report.updatedAt ?? null);
+      } else if (j.agents && typeof j.agents === "object") {
         setTuningApplyResults(previous => agentTypes ? { ...previous, ...j.agents } : j.agents);
       }
       if (!r.ok) {
@@ -2450,20 +2538,28 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
     }
   }
 
-  async function persistTuning(settings: VoiceTuning, successMessage: string, applyNow = false) {
+  async function persistTuning(settings: VoiceTuning, successMessage: string, applyNow = false, expectedVersion = tuningInfo?.version) {
     setTuningSaving(true); setTuningErr(null);
     let saved = false;
     try {
       const r = await fetch(`${API_BASE}/api/voice/convai/voice-settings`, {
         method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({ ...settings, ...(expectedVersion ? { expectedVersion } : {}) }),
       });
       const j = await r.json().catch(() => ({}));
+      if (r.status === 409 && j.code === "voice_settings_conflict") {
+        // Otro admin guardó desde que cargamos: no se pisa nada; el admin decide.
+        setTuningConflict({ attempted: settings, applyNow, successMessage, current: j.current });
+        return;
+      }
       if (!r.ok) throw new Error(j.error || "Error guardando los ajustes de voz");
       saved = true;
+      setTuningConflict(null);
       setTuningInfo(j); setTuning(j.settings); setTuningSavedAt(Date.now());
       setTuningApplied(false);
       setTuningApplyResults({});
+      setTuningApplyReportAt(null);
+      if (fullHistory) loadFullHistory();
       if (applyNow) {
         const applied = await applySavedTuning(undefined, false);
         if (!applied) return;
@@ -2489,6 +2585,12 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
   const failedVoiceAgents = (Object.entries(tuningApplyResults) as [VoiceAgentType, VoiceApplyResult][])
     .filter(([, result]) => result.status === "error")
     .map(([type]) => type);
+
+  async function confirmConflictingSave() {
+    if (!tuningConflict) return;
+    const { attempted, successMessage, applyNow, current } = tuningConflict;
+    await persistTuning(attempted, successMessage, applyNow, current.version);
+  }
 
   async function restoreTuning(entry: VoiceTuningHistory) {
     await persistTuning(entry.settings, "Ajuste anterior de la voz de Arturo restaurado mediante el guardado normal.");
@@ -2832,6 +2934,25 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
 
             {tuningErr && <p style={{ fontSize: 11, color: "#fca5a5", marginTop: 10 }} data-testid="convai-voice-tuning-error">{tuningErr}</p>}
 
+            {tuningConflict && (
+              <div role="alert" data-testid="convai-voice-tuning-conflict" style={{ marginTop: 10, padding: 10, borderRadius: 6, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.4)", fontSize: 11, color: "#fcd34d", display: "grid", gap: 8 }}>
+                <span>
+                  Otro administrador cambió la voz mientras editabas
+                  {tuningConflict.current.lastChange && <> ({tuningConflict.current.lastChange.userName}, {new Date(tuningConflict.current.lastChange.changedAt).toLocaleString("es-ES")})</>}.
+                  {tuningConflict.current.settings && <> Ahora: estabilidad {tuningConflict.current.settings.stability.toFixed(2)} · fidelidad {tuningConflict.current.settings.similarityBoost.toFixed(2)} · velocidad {tuningConflict.current.settings.speed.toFixed(2)}.</>}
+                  {" "}No se ha guardado nada.
+                </span>
+                <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button type="button" className="btn" style={{ fontSize: 11, padding: "4px 10px" }} onClick={() => loadTuning()} disabled={tuningSaving} data-testid="convai-voice-tuning-conflict-reload">
+                    <RefreshCw size={12} /> Recargar lo guardado
+                  </button>
+                  <button type="button" className="btn btn-gold" style={{ fontSize: 11, padding: "4px 10px" }} onClick={confirmConflictingSave} disabled={tuningSaving} data-testid="convai-voice-tuning-conflict-confirm">
+                    <CheckCircle2 size={12} /> Guardar mi ajuste de todos modos
+                  </button>
+                </span>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
               <button onClick={previewTuning} disabled={!tuning || tuningPreviewing || tuningSaving || tuningApplying} className="btn" style={{ fontSize: 11, padding: "4px 10px" }} data-testid="convai-voice-tuning-preview"
                 title="Genera una frase corta con la misma voz y modelo que Arturo usando los valores actuales del formulario (no guarda nada)">
@@ -2878,6 +2999,11 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
             </div>
             {Object.keys(tuningApplyResults).length > 0 && (
               <div style={{ display: "grid", gap: 5, marginTop: 10 }} data-testid="convai-voice-tuning-apply-results" aria-live="polite">
+                {tuningApplyReportAt && (
+                  <span style={{ fontSize: 10, color: "var(--t3)" }} data-testid="convai-voice-tuning-apply-report-at">
+                    Última aplicación: {new Date(tuningApplyReportAt).toLocaleString("es-ES")}
+                  </span>
+                )}
                 {(Object.entries(tuningApplyResults) as [VoiceAgentType, VoiceApplyResult][]).map(([type, result]) => {
                   const statusText = result.status === "applied" ? "Actualizado"
                     : result.status === "error" ? "Falló"
@@ -2933,6 +3059,36 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
                   ))}
                 </div>
               )}
+              {(tuningInfo?.history?.length ?? 0) >= 5 && (
+                <button type="button" className="btn" style={{ fontSize: 10, padding: "4px 8px", marginTop: 8 }}
+                  onClick={() => fullHistory ? (setFullHistory(null), setFullHistoryCursor(null)) : loadFullHistory()}
+                  disabled={fullHistoryBusy} data-testid="convai-voice-history-full-toggle">
+                  {fullHistoryBusy && !fullHistory ? <Loader2 size={11} className="animate-spin" /> : <BookOpen size={11} />}
+                  {" "}{fullHistory ? "Ocultar historial completo" : "Ver historial completo"}
+                </button>
+              )}
+              {fullHistory && (
+                <div data-testid="convai-voice-history-full" style={{ display: "grid", gap: 5, marginTop: 8, maxHeight: 320, overflowY: "auto", paddingRight: 4 }}>
+                  {fullHistory.map(entry => (
+                    <div key={entry.id} data-testid={`convai-voice-history-full-${entry.id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", padding: "6px 8px", borderRadius: 6, background: "rgba(255,255,255,0.02)", fontSize: 10, color: "var(--t3)" }}>
+                      <span>
+                        <span style={{ color: "var(--t2)" }}>{entry.userName}</span> · {new Date(entry.changedAt).toLocaleString("es-ES")} ·{" "}
+                        <span style={{ fontFamily: "monospace" }}>{entry.settings.stability.toFixed(2)} / {entry.settings.similarityBoost.toFixed(2)} / {entry.settings.speed.toFixed(2)}</span>
+                      </span>
+                      <button type="button" className="btn" style={{ fontSize: 10, padding: "3px 7px" }} onClick={() => restoreTuning(entry)} disabled={tuningSaving || tuningPreviewing}
+                        data-testid={`convai-voice-history-full-restore-${entry.id}`} title="Guarda estos valores usando la validación normal">
+                        <RotateCcw size={10} /> Volver a este ajuste
+                      </button>
+                    </div>
+                  ))}
+                  {fullHistory.length === 0 && <span style={{ fontSize: 10, color: "var(--t3)" }}>Sin cambios guardados.</span>}
+                  {fullHistoryCursor && (
+                    <button type="button" className="btn" style={{ fontSize: 10, padding: "4px 8px", justifySelf: "start" }} onClick={() => loadFullHistory(true)} disabled={fullHistoryBusy} data-testid="convai-voice-history-full-more">
+                      {fullHistoryBusy ? <Loader2 size={11} className="animate-spin" /> : null} Cargar cambios más antiguos
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -2970,6 +3126,47 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
                 Crear agente
               </button>
             </div>
+          </div>
+
+          {/* Duplicados y huérfanos (#88) */}
+          <div data-testid="convai-orphans-card" style={{ background: "rgba(0,0,0,0.2)", borderRadius: 8, padding: 14, border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div>
+                <p style={{ fontSize: 12, color: "var(--gold)", fontWeight: 600 }}>Agentes duplicados y huérfanos</p>
+                <p style={{ fontSize: 11, color: "var(--t3)", marginTop: 2 }}>
+                  Restos de reinicios anteriores que ya no reciben la voz ni el prompt. Nunca se borran los que usa la plataforma ni los creados a mano.
+                </p>
+              </div>
+              <button type="button" className="btn" style={{ fontSize: 11, padding: "4px 10px" }} onClick={loadAgentAudit} disabled={agentAuditBusy} data-testid="convai-orphans-scan">
+                {agentAuditBusy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} Revisar cuenta
+              </button>
+            </div>
+            {agentAudit && (
+              <div style={{ marginTop: 10, display: "grid", gap: 5 }}>
+                {agentAudit.duplicateNames.length > 0 && (
+                  <p style={{ fontSize: 11, color: "#fcd34d" }}>
+                    Nombres repetidos: {agentAudit.duplicateNames.map(d => `${d.name} ×${d.count}`).join(" · ")}
+                  </p>
+                )}
+                {agentAudit.agents.map(a => (
+                  <label key={a.agentId} data-testid={`convai-orphans-agent-${a.agentId}`} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--t2)", cursor: a.status === "orphan" ? "pointer" : "default" }}>
+                    <input type="checkbox" disabled={a.status !== "orphan" || agentAuditBusy}
+                      checked={orphanSelection.includes(a.agentId)}
+                      onChange={() => setOrphanSelection(prev => prev.includes(a.agentId) ? prev.filter(id => id !== a.agentId) : [...prev, a.agentId])} />
+                    <span style={{ fontWeight: 600, minWidth: 70, color: a.status === "orphan" ? "#fca5a5" : a.status === "in_use" ? "#86efac" : "var(--t3)" }}>
+                      {a.status === "orphan" ? "Huérfano" : a.status === "in_use" ? "En uso" : "Manual"}
+                    </span>
+                    <span>{a.name}</span>
+                    <span style={{ fontFamily: "monospace", color: "var(--t3)" }}>{a.agentId}</span>
+                    {a.references.length > 0 && <span style={{ color: "var(--t3)" }}>· {a.references.join(", ")}</span>}
+                  </label>
+                ))}
+                <button type="button" className="btn" style={{ fontSize: 11, padding: "4px 10px", justifySelf: "start", marginTop: 4, borderColor: "rgba(239,68,68,0.45)", color: "#fca5a5" }}
+                  onClick={deleteSelectedOrphans} disabled={agentAuditBusy || orphanSelection.length === 0} data-testid="convai-orphans-delete">
+                  <Trash2 size={12} /> Borrar huérfanos seleccionados ({orphanSelection.length})
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Lista de agentes */}

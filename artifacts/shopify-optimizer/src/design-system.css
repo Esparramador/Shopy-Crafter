@@ -1216,6 +1216,9 @@ code {
    z-index > .modal-overlay; mientras haya un modal abierto (hook useModalLock
    pone data-modal-open en <body>) se ocultan para no tapar el modal. */
 body[data-modal-open] .floating-widget { visibility: hidden; pointer-events: none; }
+/* Igual mientras el chat del panel de cliente (ClientChatbot) está abierto: el
+   panel Setup arrastrable no debe quedar encima del chat (#95). */
+body[data-client-chat-open] .floating-widget { visibility: hidden; pointer-events: none; }
 
 .modal-box {
   background: var(--ink2); border: 1px solid var(--bdr2);
@@ -5386,4 +5389,9 @@ html:not(.sc-cursor-on) a, html:not(.sc-cursor-on) button { cursor: pointer !imp
   .site-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
   /* El botón del chat flota abajo a la derecha: el pie deja ese hueco para que no tape el copyright ni los enlaces. */
   .fp-footer-standalone, .pp-footer, .shop-footer { padding-bottom: 96px !important; }
+}
+/* En escritorio el botón (56 px a 24 px del borde) también caía sobre el correo y los enlaces legales
+   de la última fila del pie: se deja el mismo hueco en las páginas que muestran el asistente. */
+@media (min-width: 901px) {
+  .fp-footer-standalone, .pp-footer { padding-bottom: 96px !important; }
 }
