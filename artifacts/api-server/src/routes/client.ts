@@ -24,7 +24,7 @@ import { db as _db, clientKnowledgeTable } from "@workspace/db";
 import { eq as _eq, desc as _desc } from "drizzle-orm";
 import { sendPushToAdmins, sendPushToClientByProject } from "../lib/push-helper.js";
 import { WooClient } from "../lib/woo-client.js";
-import { wooOverview } from "../lib/woo-metrics.js";
+import { wooInventory, wooOverview } from "../lib/woo-metrics.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -998,6 +998,36 @@ ${filesContext}
 
 // ─── GET /api/client/platform-data ───────────────────────────────────────────
 // Returns real financial analytics for any CMS (Shopify, WooCommerce, PrestaShop, Stripe)
+router.get("/platform-inventory", async (req, res): Promise<void> => {
+  try {
+    const projectId = getClientProjectId(req);
+    const pid = parseInt(projectId, 10);
+    if (!projectId || !Number.isSafeInteger(pid) || pid < 1) { res.status(400).json({ error: "No project linked" }); return; }
+    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, pid)).limit(1);
+    if (!project) { res.status(404).json({ error: "Proyecto no encontrado" }); return; }
+    if ((project.platformType ?? "") !== "woocommerce") { res.status(400).json({ error: "La tienda no es WooCommerce" }); return; }
+
+    const wc = new WooClient(project);
+    const inventory = await wooInventory(wc);
+    res.json({
+      source: wc.origin,
+      fetchedAt: new Date().toISOString(),
+      complete: true,
+      inventoryAlerts: [...inventory.outOfStock, ...inventory.backorder, ...inventory.lowStock].map(p => ({
+        product_title: p.name,
+        variant_title: "",
+        current_stock: p.stockQuantity,
+        days_remaining: null,
+        status: p.stockStatus === "outofstock" ? "critical" : "warning",
+        sku: p.sku,
+      })),
+    });
+  } catch (err: any) {
+    logger.warn({ err: err?.message }, "GET /client/platform-inventory error");
+    res.status(502).json({ error: err instanceof Error ? err.message : "No se pudo cargar el inventario" });
+  }
+});
+
 router.get("/platform-data", async (req, res): Promise<void> => {
   try {
     const projectId = getClientProjectId(req);
@@ -1016,10 +1046,6 @@ router.get("/platform-data", async (req, res): Promise<void> => {
         revenue: { total30d: live.revenue30d, orders30d: live.orders30d, aov: live.aov, trend: null, dailyChart: live.dailyChart },
         lastDataDate: live.fetchedAt,
         topProducts: [], events: [], cogsData: [],
-        inventoryAlerts: [...live.outOfStock,...live.backorder,...live.lowStock].map(p=>({
-          product_title:p.name,variant_title:"",current_stock:p.stockQuantity,days_remaining:null,
-          status:p.stockStatus==="outofstock"?"critical":"warning",sku:p.sku,
-        })),
       });
       return;
     }
@@ -1050,37 +1076,33 @@ router.get("/platform-data", async (req, res): Promise<void> => {
     const lastDataDate = allRows.length ? String(allRows[allRows.length - 1]!.date) : null;
 
     // Top products by audit score
-    const topProducts = await db.execute(sql`
-      SELECT title, price, audit_score, audit_grade, handle
-      FROM products
-      WHERE project_id = ${pid} AND audit_score IS NOT NULL
-      ORDER BY audit_score DESC LIMIT 5
-    `).catch(() => ({ rows: [] }));
-
-    // Recent events
-    const events = await db.execute(sql`
-      SELECT event_type, payload, created_at
-      FROM events
-      WHERE project_id = ${String(pid)}
-      ORDER BY created_at DESC LIMIT 15
-    `).catch(() => ({ rows: [] }));
-
-    // Inventory alerts
-    const invAlerts = await db.execute(sql`
-      SELECT product_title, variant_title, current_stock, days_remaining, status, sku
-      FROM inventory_tracking
-      WHERE project_id = ${String(pid)} AND status IN ('critical','warning')
-      ORDER BY days_remaining ASC NULLS LAST LIMIT 8
-    `).catch(() => ({ rows: [] }));
-
-    // COGS data
-    const cogsData = await db.execute(sql`
-      SELECT p.title, c.total_cogs, c.unit_cost, c.shopify_payment_fee, c.shipping_cost_domestic
-      FROM cogs c
-      JOIN products p ON p.shopify_product_id = c.shopify_product_id AND p.project_id = c.project_id
-      WHERE c.project_id = ${pid}
-      ORDER BY c.total_cogs DESC LIMIT 8
-    `).catch((err) => { logger.warn({ err, pid }, "client platform-data: COGS query failed"); return { rows: [] }; });
+    const [topProducts, events, invAlerts, cogsData] = await Promise.all([
+      db.execute(sql`
+        SELECT title, price, audit_score, audit_grade, handle
+        FROM products
+        WHERE project_id = ${pid} AND audit_score IS NOT NULL
+        ORDER BY audit_score DESC LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      db.execute(sql`
+        SELECT event_type, payload, created_at
+        FROM events
+        WHERE project_id = ${String(pid)}
+        ORDER BY created_at DESC LIMIT 15
+      `).catch(() => ({ rows: [] })),
+      db.execute(sql`
+        SELECT product_title, variant_title, current_stock, days_remaining, status, sku
+        FROM inventory_tracking
+        WHERE project_id = ${String(pid)} AND status IN ('critical','warning')
+        ORDER BY days_remaining ASC NULLS LAST LIMIT 8
+      `).catch(() => ({ rows: [] })),
+      db.execute(sql`
+        SELECT p.title, c.total_cogs, c.unit_cost, c.shopify_payment_fee, c.shipping_cost_domestic
+        FROM cogs c
+        JOIN products p ON p.shopify_product_id = c.shopify_product_id AND p.project_id = c.project_id
+        WHERE c.project_id = ${pid}
+        ORDER BY c.total_cogs DESC LIMIT 8
+      `).catch((err) => { logger.warn({ err, pid }, "client platform-data: COGS query failed"); return { rows: [] }; }),
+    ]);
 
     res.json({
       platformType,

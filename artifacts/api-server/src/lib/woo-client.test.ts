@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 vi.mock("./crypto.js",()=>({safeDecrypt:(s:string)=>s}));
 import { WooClient, WooError, resolveWooCredentials, wooId } from "./woo-client.js";
-import { summarizeWooOrders, wooInventory } from "./woo-metrics.js";
+import { summarizeWooOrders, wooInventory, wooOverview } from "./woo-metrics.js";
 
 const project = {id:1,shopDomain:"https://shop.example",clientId:"key",clientSecret:"secret"} as any;
 function page(data:any,total:number,pages:number) { return new Response(JSON.stringify(data),{headers:{"x-wp-total":String(total),"x-wp-totalpages":String(pages)}}); }
@@ -53,6 +53,24 @@ describe("WooCommerce isolated client",()=>{
     expect(fetcher.mock.calls[1]![0]).toContain("page=2");
     expect(fetcher.mock.calls[1]![0]).toContain("status=processing");
   });
+  it("loads later pages concurrently in small batches and verifies page metadata", async () => {
+    let active = 0, peak = 0;
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise(resolve => setTimeout(resolve, 8));
+      const pageNumber = Number(new URL(String(input)).searchParams.get("page"));
+      active--;
+      const count = pageNumber === 4 ? 50 : 100;
+      return page(Array.from({ length: count }, (_, i) => ({ id: (pageNumber - 1) * 100 + i + 1 })), 350, 4);
+    }) as any;
+    const wc = new WooClient(project, fetcher);
+    const result = await wc.all<{ id: number }>("/products");
+    expect(result).toHaveLength(350);
+    expect(result[349]?.id).toBe(350);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(3);
+  });
   it("never calls a truncated list complete",async()=>{
     const wc=new WooClient(project,vi.fn().mockResolvedValue(page([{id:1}],2,2)));
     await expect(wc.all("/orders",{},1)).rejects.toThrow("incompleta");
@@ -96,6 +114,25 @@ describe("explicit Woo revenue cohort",()=>{
   });
   it("valid empty reads are really zero",()=>{
     expect(summarizeWooOrders([],"EUR")).toMatchObject({revenue30d:0,orders30d:0,aov:0});
+  });
+});
+describe("fast Woo overview", () => {
+  it("counts products from verified paging headers and does not wait for inventory", async () => {
+    const wc = {
+      origin: "https://shop.example",
+      request: vi.fn()
+        .mockResolvedValueOnce({ endpoints: [{ methods: ["GET"], args: { after: {}, before: {}, dates_are_gmt: {}, status: { enum: ["any"] } } }] })
+        .mockResolvedValueOnce([{ id: "woocommerce_currency", value: "EUR" }]),
+      all: vi.fn().mockResolvedValue([order()]),
+      page: vi.fn(async (path: string) => ({
+        data: [], total: path === "/products" ? 123 : 9, totalPages: 1, page: 1, hasMore: false,
+      })),
+    } as any;
+    const result = await wooOverview(wc);
+    expect(result).toMatchObject({ totalProducts: 123, totalCustomers: 9, revenue30d: 121, complete: true });
+    expect(wc.all).toHaveBeenCalledTimes(1);
+    expect(wc.page).toHaveBeenCalledWith("/products", { per_page: "1", page: "1" });
+    expect(result).not.toHaveProperty("stockAlerts");
   });
 });
 describe("variation-aware inventory",()=>{

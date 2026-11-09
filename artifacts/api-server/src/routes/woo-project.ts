@@ -47,10 +47,13 @@ router.get("/woo-media/:projectId/:token",async(req,res):Promise<void>=>{
 router.use(base,requireAdmin);
 router.get(`${base}/overview`,handler(async(_req,res,wc)=>{res.json(await wooOverview(wc));}));
 router.get(`${base}/inventory`,handler(async(_req,res,wc)=>{
-  const settings = await wc.request("GET","/settings/general");
+  const [settings, inventory] = await Promise.all([
+    wc.request<any[]>("GET","/settings/general"),
+    wooInventory(wc),
+  ]);
   const currency=settings.find((s:any)=>s.id==="woocommerce_currency")?.value;
   if (!currency) throw new WooError("Moneda no disponible");
-  res.json({...await wooInventory(wc),currency,source:wc.origin,fetchedAt:new Date().toISOString()});
+  res.json({...inventory,currency,source:wc.origin,fetchedAt:new Date().toISOString()});
 }));
 router.get(`${base}/resources/:resource`,handler(async(req,res,wc)=>{
   const page=wooId(req.query.page ?? 1), perPage=wooId(req.query.per_page ?? 20);

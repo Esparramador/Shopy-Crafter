@@ -122,20 +122,34 @@ export class WooClient {
     return { data: data as T[], total, totalPages: pages, page, hasMore: page < pages, fetchedAt: new Date().toISOString(), source: this.origin };
   }
   async all<T = any>(path: string, query: Record<string, string> = {}, maxPages = 50): Promise<T[]> {
-    const out: T[] = [];
     const deadline = Date.now() + 90_000;
-    let expected: number | undefined;
-    for (let p = 1; p <= maxPages; p++) {
+    const first = await this.page<T>(path, { ...query, per_page: "100", page: "1" });
+    if (first.totalPages > maxPages) throw new WooError(`Lectura incompleta: límite de ${maxPages * 100} registros`);
+
+    // WooCommerce exposes the page count in the first response. Fetch later pages
+    // in small batches: this avoids a full round-trip per page without flooding the store.
+    const pages = [first];
+    const concurrency = 3;
+    for (let start = 2; start <= first.totalPages; start += concurrency) {
       if (Date.now() > deadline) throw new WooError("Lectura incompleta: superado el tiempo máximo");
-      const r = await this.page<T>(path, { ...query, per_page: "100", page: String(p) });
-      if (expected !== undefined && r.total !== expected) throw new WooError("El listado cambió durante la lectura; actualiza para conciliar");
-      expected = r.total;
-      out.push(...r.data);
-      if (!r.hasMore) {
-        if (out.length !== r.total) throw new WooError("Lectura incompleta: total y páginas no coinciden");
-        return out;
+      const pageNumbers = Array.from(
+        { length: Math.min(concurrency, first.totalPages - start + 1) },
+        (_, i) => start + i,
+      );
+      const batch = await Promise.all(pageNumbers.map(page =>
+        this.page<T>(path, { ...query, per_page: "100", page: String(page) }),
+      ));
+      for (let i = 0; i < batch.length; i++) {
+        const result = batch[i]!;
+        if (result.total !== first.total || result.totalPages !== first.totalPages || result.page !== pageNumbers[i]) {
+          throw new WooError("El listado cambió durante la lectura; actualiza para conciliar");
+        }
       }
+      pages.push(...batch);
     }
-    throw new WooError(`Lectura incompleta: límite de ${maxPages * 100} registros`);
+
+    const out = pages.flatMap(result => result.data);
+    if (out.length !== first.total) throw new WooError("Lectura incompleta: total y páginas no coinciden");
+    return out;
   }
 }

@@ -5,7 +5,7 @@ import { AMBER, Badge, Empty, ErrorBox, GREEN, MUTED, mono, panelStyle, Provenan
 export type Overview = {
   revenue30d: number; gross30d: number; refunds30d: number; taxes30d: number; shipping30d: number; orders30d: number; aov: number;
   totalProducts: number; totalCustomers: number; currency: string; source: string; fetchedAt: string;
-  period: { from: string; to: string; timezone: string }; definition: string; complete: boolean; stockAlerts: any[]; recentOrders: any[];
+  period: { from: string; to: string; timezone: string }; definition: string; complete: boolean; recentOrders: any[];
 };
 
 export function useOverview(projectId: string) {
@@ -14,12 +14,14 @@ export function useOverview(projectId: string) {
 
 export function OverviewTab({ ov }: { ov: ReturnType<typeof useOverview> }) {
   if (ov.loading && !ov.data) return <Skeleton rows={6} />;
-  if (ov.error) return <ErrorBox error={ov.error} onRetry={ov.reload} />;
+  if (ov.error && !ov.data) return <ErrorBox error={ov.error} onRetry={ov.reload} />;
   const d = ov.data;
   if (!d) return null;
   const c = d.currency;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {ov.error && <div role="status" style={{ ...panelStyle, padding: "10px 14px", color: AMBER, fontSize: 12 }}>No se pudo actualizar; se mantienen los últimos datos recibidos. <button onClick={ov.reload} style={{ marginLeft: 8, color: WL, background: "none", border: 0, cursor: "pointer" }}>Reintentar</button></div>}
+      {ov.refreshing && <div role="status" aria-live="polite" style={{ fontSize: 11, color: MUTED }}>Actualizando datos…</div>}
       <div style={{ ...panelStyle, padding: "12px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: 12.5 }}>
           <b style={{ color: WL }}>Periodo</b> {fmtDateShort(d.period?.from)} a {fmtDateShort(d.period?.to)} ({d.period?.timezone}) · <b style={{ color: WL }}>Divisa</b> {c}
@@ -46,7 +48,9 @@ export function OverviewTab({ ov }: { ov: ReturnType<typeof useOverview> }) {
             <span style={{ fontSize: 12, color: MUTED }}>{fmtDateShort(o.date)}</span>,
           ])} />
       </div>
-      {(d.stockAlerts ?? []).length > 0 && <StockTable title="Alertas de stock" items={d.stockAlerts} currency={c} color={RED} />}
+      <div style={{ ...panelStyle, padding: "12px 16px", color: MUTED, fontSize: 12 }}>
+        El inventario y sus alertas se consultan al abrir la pestaña «Inventario».
+      </div>
     </div>
   );
 }
@@ -70,11 +74,13 @@ type Inventory = { outOfStock: any[]; lowStock: any[]; backorder: any[]; totalTr
 export function InventoryTab({ projectId }: { projectId: string }) {
   const inv = useFetch<Inventory>(`${hubBase(projectId)}/inventory`);
   if (inv.loading && !inv.data) return <Skeleton rows={6} />;
-  if (inv.error) return <ErrorBox error={inv.error} onRetry={inv.reload} />;
+  if (inv.error && !inv.data) return <ErrorBox error={inv.error} onRetry={inv.reload} />;
   const d = inv.data;
   if (!d) return null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {inv.error && <div role="status" style={{ ...panelStyle, padding: "10px 14px", color: AMBER, fontSize: 12 }}>No se pudo actualizar; se mantienen los últimos datos recibidos. <button onClick={inv.reload} style={{ marginLeft: 8, color: WL, background: "none", border: 0, cursor: "pointer" }}>Reintentar</button></div>}
+      {inv.refreshing && <div role="status" aria-live="polite" style={{ fontSize: 11, color: MUTED }}>Actualizando inventario…</div>}
       <Provenance source={d.source} fetchedAt={d.fetchedAt} extra={<span>divisa: {d.currency}</span>} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
         <KpiCard label="Sin stock" value={String(d.outOfStockCount)} sub="Requieren reposición" icon="" color={RED} />
