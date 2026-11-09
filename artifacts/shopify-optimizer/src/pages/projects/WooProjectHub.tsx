@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useRoute } from "wouter";
 import { BarChart3, Boxes, ClipboardList, FileUp, FolderTree, Package, Tag, Users } from "lucide-react";
-import { ProductsTab } from "./woo/ProductsTab";
-import { TaxonomyTab } from "./woo/TaxonomyTab";
-import { CouponsTab, CustomersTab, OrdersTab } from "./woo/CommerceTabs";
 import { InventoryTab, OverviewTab, useOverview } from "./woo/OverviewTabs";
-import { ImportsTab } from "./woo/ImportsTab";
 import { AMBER, MUTED, WD, WL, WP } from "./woo/ui";
+
+const ProductsTab = lazy(() => import("./woo/ProductsTab").then(m => ({ default: m.ProductsTab })));
+const TaxonomyTab = lazy(() => import("./woo/TaxonomyTab").then(m => ({ default: m.TaxonomyTab })));
+const OrdersTab = lazy(() => import("./woo/CommerceTabs").then(m => ({ default: m.OrdersTab })));
+const CustomersTab = lazy(() => import("./woo/CommerceTabs").then(m => ({ default: m.CustomersTab })));
+const CouponsTab = lazy(() => import("./woo/CommerceTabs").then(m => ({ default: m.CouponsTab })));
+const ImportsTab = lazy(() => import("./woo/ImportsTab").then(m => ({ default: m.ImportsTab })));
 
 type Tab = "overview" | "products" | "taxonomy" | "orders" | "customers" | "coupons" | "inventory" | "imports";
 
@@ -55,13 +58,13 @@ function Hub({ projectId }: { projectId: string }) {
 
       <div style={{ padding: "24px 24px 60px", maxWidth: 1400, margin: "0 auto" }}>
         {tab === "overview" && <OverviewTab ov={ov} />}
-        {tab === "products" && <ProductsTab projectId={projectId} currency={currency} />}
-        {tab === "taxonomy" && <TaxonomyTab projectId={projectId} />}
-        {tab === "orders" && <OrdersTab projectId={projectId} />}
-        {tab === "customers" && <CustomersTab projectId={projectId} />}
-        {tab === "coupons" && <CouponsTab projectId={projectId} currency={currency} />}
+        {tab === "products" && <Suspense fallback={<div role="status" style={{ color: MUTED, padding: 24 }}>Cargando productos…</div>}><ProductsTab projectId={projectId} currency={currency} /></Suspense>}
+        {tab === "taxonomy" && <Suspense fallback={<div role="status" style={{ color: MUTED, padding: 24 }}>Cargando categorías…</div>}><TaxonomyTab projectId={projectId} /></Suspense>}
+        {tab === "orders" && <Suspense fallback={<div role="status" style={{ color: MUTED, padding: 24 }}>Cargando pedidos…</div>}><OrdersTab projectId={projectId} /></Suspense>}
+        {tab === "customers" && <Suspense fallback={<div role="status" style={{ color: MUTED, padding: 24 }}>Cargando clientes…</div>}><CustomersTab projectId={projectId} /></Suspense>}
+        {tab === "coupons" && <Suspense fallback={<div role="status" style={{ color: MUTED, padding: 24 }}>Cargando cupones…</div>}><CouponsTab projectId={projectId} currency={currency} /></Suspense>}
         {tab === "inventory" && <InventoryTab projectId={projectId} />}
-        {tab === "imports" && <ImportsTab projectId={projectId} />}
+        {tab === "imports" && <Suspense fallback={<div role="status" style={{ color: MUTED, padding: 24 }}>Cargando importador…</div>}><ImportsTab projectId={projectId} /></Suspense>}
       </div>
     </div>
   );

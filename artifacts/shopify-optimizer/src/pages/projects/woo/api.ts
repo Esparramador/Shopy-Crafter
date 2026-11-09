@@ -1,5 +1,6 @@
 // Cliente del contrato docs/woocommerce-management-contract.md. Sin hooks inventados: fetch + tipos derivados.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 export const API = import.meta.env.BASE_URL.replace(/\/$/, "") + "/api";
 export const hubBase = (projectId: string) => `${API}/admin/woo/project/${encodeURIComponent(projectId)}`;
@@ -44,36 +45,41 @@ export const listUrl = (pid: string, resource: ResourceName, p: { parentId?: num
 export const detailUrl = (pid: string, resource: ResourceName, id: number | string, parentId?: number | string) =>
   `${hubBase(pid)}/resources/${resource}/${id}${qs({ parentId })}`;
 
-/** Recarga al volver a la pestaña/ventana (visibilidad) además de al montar. */
-function useRevisit(cb: () => void) {
-  const ref = useRef(cb);
-  ref.current = cb;
-  useEffect(() => {
-    const on = () => { if (document.visibilityState === "visible") ref.current(); };
-    document.addEventListener("visibilitychange", on);
-    return () => document.removeEventListener("visibilitychange", on);
-  }, []);
-}
-
 export function useFetch<T>(url: string | null) {
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<HttpError | null>(null);
-  const [loading, setLoading] = useState(!!url);
-  const [tick, setTick] = useState(0);
-  const reload = useCallback(() => setTick(t => t + 1), []);
+  const query = useQuery<T, HttpError>({
+    queryKey: ["woo-resource", url],
+    queryFn: ({ signal }) => {
+      if (!url) throw new HttpError("Recurso no disponible", 0, null);
+      return req<T>(url, { signal });
+    },
+    enabled: !!url,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const reload = useCallback(() => { void query.refetch(); }, [query.refetch]);
+
+  // On return to the app, refresh in the background instead of clearing a usable
+  // response and showing a full-page skeleton again.
+  const refetch = query.refetch;
   useEffect(() => {
-    if (!url) { setData(null); setLoading(false); return; }
-    let live = true;
-    setData(null);
-    setLoading(true);
-    setError(null);
-    req<T>(url)
-      .then(d => { if (live) { setData(d); setLoading(false); } })
-      .catch(e => { if (live) { setData(null); setError(e); setLoading(false); } });
-    return () => { live = false; };
-  }, [url, tick]);
-  useRevisit(reload);
-  return { data, error, loading, reload };
+    if (!url) return;
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refetch();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [url, refetch]);
+
+  return {
+    data: query.data ?? null,
+    error: query.error ?? null,
+    loading: query.isLoading,
+    refreshing: query.isFetching && !query.isLoading,
+    reload,
+    dataUpdatedAt: query.dataUpdatedAt,
+  };
 }
 
 export function useList<T = any>(pid: string, resource: ResourceName, p: { parentId?: number | string; page?: number; per_page?: number; search?: string; status?: string }, enabled = true) {

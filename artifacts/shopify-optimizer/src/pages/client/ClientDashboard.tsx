@@ -111,19 +111,48 @@ export default function ClientDashboard() {
   useEffect(() => {
     const h = new Date().getHours();
     setGreeting(h < 12 ? "Buenos días" : h < 20 ? "Buenas tardes" : "Buenas noches");
+    let active = true;
+    const controller = new AbortController();
+    setData(null);
+    setVault([]);
+    setBrandDna(undefined);
+    setPackUsage([]);
     setLoading(true);
-    Promise.all([
-      fetch(apid(`${API}/client/dashboard`), { credentials: "include" }).then(r => r.json()),
-      fetch(apid(`${API}/client/vault-files`), { credentials: "include" }).then(r => r.json()).catch(() => []),
-      fetch(apid(`${API}/client/brand-dna`), { credentials: "include" }).then(r => r.json()).catch(() => ({ ok: false })),
-      fetch(apid(`${API}/client/pack-usage`), { credentials: "include" }).then(r => r.ok ? r.json() : { usage: [] }).catch(() => ({ usage: [] })),
-    ]).then(([d, v, bdna, pu]) => {
-      setPackUsage(Array.isArray(pu?.usage) ? pu.usage : []);
-      setData(d?.totalProducts !== undefined ? d : null);
+    const dashboardUrl = apid(`${API}/client/dashboard`);
+    fetch(dashboardUrl, { credentials: "include", signal: controller.signal })
+      .then(async r => {
+        const d = await r.json().catch(() => null);
+        if (!r.ok || d?.totalProducts === undefined) throw new Error(d?.error ?? "No se pudo cargar el proyecto");
+        if (active) {
+          setData(d);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) { setData(null); setLoading(false); }
+      });
+
+    // These sections are useful but do not determine which dashboard to render.
+    // Load them independently so a slow vault/brand request cannot hold the KPIs.
+    const optional = [
+      fetch(apid(`${API}/client/vault-files`), { credentials: "include", signal: controller.signal })
+        .then(r => r.ok ? r.json() : [])
+        .catch(() => []),
+      fetch(apid(`${API}/client/brand-dna`), { credentials: "include", signal: controller.signal })
+        .then(r => r.ok ? r.json() : ({ ok: false }))
+        .catch(() => ({ ok: false })),
+      fetch(apid(`${API}/client/pack-usage`), { credentials: "include", signal: controller.signal })
+        .then(r => r.ok ? r.json() : ({ usage: [] }))
+        .catch(() => ({ usage: [] })),
+    ];
+    Promise.all(optional).then(([v, bdna, pu]) => {
+      if (!active) return;
       setVault(Array.isArray(v) ? v : []);
       setBrandDna(bdna?.ok && bdna.brandDna ? bdna.brandDna : null);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+      setPackUsage(Array.isArray(pu?.usage) ? pu.usage : []);
+    });
+
+    return () => { active = false; controller.abort(); };
   }, [previewPid]);
 
   const prod = useCountUp(data?.totalProducts ?? 0);

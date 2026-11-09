@@ -20,6 +20,7 @@ interface StoreSummary {
   totalAttributed: number;
   sparkline: number[];
   loading: boolean;
+  loadError: boolean;
   /** Hay snapshots de ventas sincronizados (hoy solo Shopify los genera). */
   hasData: boolean;
 }
@@ -159,7 +160,7 @@ function StoreRevenueRow({ store, rank }: { store: StoreSummary; rank: number })
           <div className="skeleton" style={{ width: 80, height: 18, borderRadius: 4, marginBottom: 4 }} />
         ) : !store.hasData ? (
           <p style={{ fontSize: 11, color: "var(--t4)" }}>
-            {store.platformType === "shopify" ? "Sin ventas sincronizadas" : "Ventas en su panel"}
+          {store.loadError ? "No se pudieron cargar las ventas" : store.platformType === "shopify" ? "Sin ventas sincronizadas" : "Ventas en su panel"}
           </p>
         ) : (
           <>
@@ -242,7 +243,7 @@ export default function Home() {
       projectId: p.id, storeName: p.name, domain: p.shopDomain ?? "",
       niche: p.storeNiche ?? "", platformType: p.platformType ?? "shopify",
       revenue30: 0, orders30: 0, aov: 0,
-      trend: 0, totalAttributed: 0, sparkline: [], loading: true, hasData: false,
+      trend: 0, totalAttributed: 0, sparkline: [], loading: true, loadError: false, hasData: false,
     }));
     setStores(initial);
 
@@ -260,10 +261,10 @@ export default function Home() {
           ...s, storeName: d.storeName ?? p.name,
           revenue30: rev30, orders30: ord30, aov,
           trend: d.trend ?? 0, totalAttributed: d.totalAttributedRevenue ?? 0,
-          sparkline, loading: false, hasData: snaps.length > 0,
+          sparkline, loading: false, loadError: false, hasData: snaps.length > 0,
         } : s));
       } catch {
-        setStores(prev => prev.map(s => s.projectId === p.id ? { ...s, loading: false } : s));
+        setStores(prev => prev.map(s => s.projectId === p.id ? { ...s, loading: false, loadError: true } : s));
       }
     }));
     setLastRefresh(new Date());
@@ -296,6 +297,9 @@ export default function Home() {
   const projectCount = projects?.length ?? 0;
 
   const storesSorted = [...stores].sort((a, b) => b.revenue30 - a.revenue30);
+  const storeSummariesReady = !isLoading && stores.length === projectCount && stores.every(s => !s.loading);
+  const revenueTotalsReady = storeSummariesReady && stores.every(s => s.platformType === "shopify" && s.hasData);
+  const showRevenueTotals = projectCount === 0 ? !isLoading : revenueTotalsReady;
 
   return (
     <div className="page-inner" style={{ maxWidth: 1200 }}>
@@ -335,22 +339,22 @@ export default function Home() {
         <KpiCard
           icon={<DollarSign size={18} />}
           label="Revenue Total (30d)"
-          value={isLoading ? "—" : `€${totalRevenue.toLocaleString("es-ES", { maximumFractionDigits: 0 })}`}
+          value={!showRevenueTotals ? "—" : `€${totalRevenue.toLocaleString("es-ES", { maximumFractionDigits: 0 })}`}
           sub={`${projectCount} tiendas combinadas`}
           color="var(--gold)"
-          trend={isLoading ? undefined : avgTrend}
+          trend={!showRevenueTotals ? undefined : avgTrend}
         />
         <KpiCard
           icon={<ShoppingCart size={18} />}
           label="Pedidos Totales (30d)"
-          value={isLoading ? "—" : totalOrders.toLocaleString("es-ES")}
+          value={!showRevenueTotals ? "—" : totalOrders.toLocaleString("es-ES")}
           sub={`AOV €${totalAov.toFixed(0)} promedio`}
           color="var(--jade)"
         />
         <KpiCard
           icon={<TrendingUp size={18} />}
           label="Revenue Atribuido IA"
-          value={isLoading ? "—" : `€${totalAttributedAll.toLocaleString("es-ES", { maximumFractionDigits: 0 })}`}
+          value={!showRevenueTotals ? "—" : `€${totalAttributedAll.toLocaleString("es-ES", { maximumFractionDigits: 0 })}`}
           sub="Generado por Shopy Crafter"
           color="#8b5cf6"
         />
@@ -476,7 +480,7 @@ export default function Home() {
               ].map(row => (
                 <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 12, color: "var(--t3)" }}>{row.label}</span>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: row.color }}>{isLoading ? "—" : row.value}</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: row.color }}>{!showRevenueTotals ? "—" : row.value}</span>
                 </div>
               ))}
             </div>

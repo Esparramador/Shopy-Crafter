@@ -13,9 +13,10 @@ interface PlatformData {
   lastDataDate?: string | null;
   topProducts: Array<{ title: string; price: string; audit_score: number; audit_grade: string }>;
   events: Array<{ event_type: string; payload: string; created_at: string }>;
-  inventoryAlerts: Array<{ product_title: string; variant_title: string; current_stock: number; days_remaining: number; status: string; sku: string }>;
+  inventoryAlerts?: InventoryAlert[];
   cogsData: Array<{ title: string; total_cogs: number; unit_cost: number; shopify_payment_fee: number; shipping_cost_domestic: number }>;
 }
+interface InventoryAlert { product_title: string; variant_title: string; current_stock: number; days_remaining: number | null; status: string; sku: string; }
 
 /** Lo que cambia entre WooCommerce y PrestaShop: colores, iconos y la guía de webhooks. */
 export interface StoreDashboardTheme {
@@ -80,20 +81,52 @@ function TrendBadge({ value }: { value: number }) {
 export default function StoreDashboard({ apid, theme }: { apid: (url: string) => string; theme: StoreDashboardTheme }) {
   const t = theme;
   const [data, setData] = useState<PlatformData | null>(null);
+  const [inventoryAlerts, setInventoryAlerts] = useState<InventoryAlert[] | null>(null);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const url = apid(`${API}/client/platform-data`);
+  const inventoryUrl = apid(`${API}/client/platform-inventory`);
 
   useEffect(() => {
     const controller = new AbortController();
     setData(null); setLoading(true); setError(null);
+    setInventoryAlerts(null); setInventoryError(null); setInventoryLoading(theme.key === "woo");
     fetch(url, { credentials: "include",signal:controller.signal })
       // Si el API falla, sin datos (antes se guardaba el cuerpo de error y la
       // página se caía al leer data.revenue).
-      .then(async r => { const d = await r.json().catch(() => null); if(!r.ok || !d?.revenue) throw new Error(d?.error ?? "Datos no disponibles"); setData(d); setLoading(false); })
+      .then(async r => {
+        const d = await r.json().catch(() => null);
+        if (!r.ok || !d?.revenue) throw new Error(d?.error ?? "Datos no disponibles");
+        setData(d);
+        if (theme.key !== "woo") setInventoryAlerts(Array.isArray(d.inventoryAlerts) ? d.inventoryAlerts : []);
+        setLoading(false);
+      })
       .catch(e => {if (!controller.signal.aborted) {setError(e.message);setLoading(false);}});
     return ()=>controller.abort();
-  }, [url]);
+  }, [url, theme.key]);
+
+  useEffect(() => {
+    if (theme.key !== "woo" || !data) return;
+    const controller = new AbortController();
+    setInventoryLoading(true);
+    setInventoryError(null);
+    fetch(inventoryUrl, { credentials: "include", signal: controller.signal })
+      .then(async r => {
+        const result = await r.json().catch(() => null);
+        if (!r.ok || !Array.isArray(result?.inventoryAlerts)) throw new Error(result?.error ?? "Inventario no disponible");
+        setInventoryAlerts(result.inventoryAlerts);
+        setInventoryLoading(false);
+      })
+      .catch(e => {
+        if (!controller.signal.aborted) {
+          setInventoryError(e instanceof Error ? e.message : "Inventario no disponible");
+          setInventoryLoading(false);
+        }
+      });
+    return () => controller.abort();
+  }, [data, inventoryUrl, theme.key]);
 
   const money = (value: number | null | undefined) => value == null ? "—" : data?.currency ? new Intl.NumberFormat("es-ES",{style:"currency",currency:data.currency}).format(value) : `${value.toLocaleString("es-ES")} (moneda no disponible)`;
 
@@ -101,7 +134,7 @@ export default function StoreDashboard({ apid, theme }: { apid: (url: string) =>
     { label: "Ingresos netos 30d", value: money(data?.revenue.total30d), icon: t.kpiIcons[0], color: t.c1, trend: data?.revenue.trend },
     { label: "Pedidos 30d", value: data ? String(data.revenue.orders30d) : "—", icon: t.kpiIcons[1], color: t.c2, trend: null },
     { label: "Ticket Medio", value: money(data?.revenue.aov), icon: t.kpiIcons[2], color: t.c3, trend: null },
-    { label: "Alertas Stock", value: data ? String(data.inventoryAlerts.length) : "—", icon: "⚠️", color: (data?.inventoryAlerts.length ?? 0) > 0 ? "#f59e0b" : "#34d399", trend: null },
+    { label: "Alertas Stock", value: inventoryLoading ? "…" : inventoryError ? "—" : inventoryAlerts ? String(inventoryAlerts.length) : "—", icon: "⚠️", color: (inventoryAlerts?.length ?? 0) > 0 ? "#f59e0b" : "#34d399", trend: null },
   ];
 
   return (
@@ -184,11 +217,12 @@ export default function StoreDashboard({ apid, theme }: { apid: (url: string) =>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
         <div style={{ background: "var(--srf)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "18px 20px" }}>
           <p style={{ margin: "0 0 12px", fontSize: 10, color: "var(--t3)", textTransform: "uppercase", letterSpacing: "0.1em" }}>⚠️ Alertas de Inventario</p>
-          {loading ? <div style={{ color: "var(--t3)", fontSize: 12 }}>Cargando...</div>
-            : (data?.inventoryAlerts.length ?? 0) === 0 ? (
+          {inventoryLoading ? <div style={{ color: "var(--t3)", fontSize: 12 }}>Comprobando inventario…</div>
+            : inventoryError ? <div role="alert" style={{ color: "#f87171", fontSize: 12 }}>No se pudo comprobar el inventario: {inventoryError}</div>
+            : (inventoryAlerts?.length ?? 0) === 0 ? (
                <div style={{ color: data ? "#34d399" : "var(--t3)", fontSize: 12, display: "flex", alignItems: "center", gap: 6, padding: "8px 0" }}>{data ? "Sin alertas en el inventario comprobado" : "Inventario no disponible"}</div>
-            ) : data?.inventoryAlerts.map((a, i) => (
-              <div key={i} className={`${t.key}-row`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 6px", borderRadius: 8, borderBottom: i < (data.inventoryAlerts.length - 1) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
+            ) : inventoryAlerts?.map((a, i) => (
+              <div key={i} className={`${t.key}-row`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 6px", borderRadius: 8, borderBottom: i < ((inventoryAlerts?.length ?? 0) - 1) ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: "var(--t1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.product_title}</div>
                   <div style={{ fontSize: 10.5, color: "var(--t3)" }}>{a.variant_title} · SKU: {a.sku || "—"}</div>
