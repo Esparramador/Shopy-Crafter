@@ -383,6 +383,8 @@ const server = app.listen(port, (err?: Error) => {
       .catch(err => logger.warn({ err }, "purgeOrphanUploads failed"));
     import("./lib/public-share.js").then(m => m.purgeExpiredShares())
       .catch(err => logger.warn({ err }, "purgeExpiredShares failed"));
+    import("./lib/brain/events.js").then(m => m.pruneBrainEvents())
+      .catch(err => logger.warn({ err }, "pruneBrainEvents failed"));
   };
   setTimeout(purgeStale, 60_000).unref();
   setInterval(purgeStale, 6 * 60 * 60 * 1000).unref();
@@ -402,6 +404,13 @@ const server = app.listen(port, (err?: Error) => {
   import("./lib/client-advisor.js")
     .then((m) => m.ensureClientKnowledgeTable())
     .catch((err) => logger.warn({ err }, "client_knowledge table warning"));
+
+  // brain_events: lo que entra por cada puerta de ShopyBrain. Se crea aquí y se poda
+  // (90 días) al arrancar y cada 6 h con purgeStale.
+  import("./lib/brain/events.js")
+    .then(async (m) => { await m.ensureBrainEventsTable(); return m.pruneBrainEvents(); })
+    .then((n) => { if (n) logger.info({ n }, "brain_events: eventos antiguos borrados"); })
+    .catch((err) => logger.warn({ err }, "brain_events table warning"));
 
   deduplicateProducts()
     .then(() => ensureAdminUser())
