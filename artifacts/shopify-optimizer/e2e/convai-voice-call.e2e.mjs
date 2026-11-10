@@ -248,6 +248,18 @@ try {
 
   // En el modal, el botón de inicio comparte nombre con el estado idle del modo
   // cliente ("Consultar por voz"): se elige explícitamente el botón.
+  // Registra cada cambio del texto de estado: «En llamada» puede durar menos que
+  // el muestreo (el agente saluda en cuanto abre el socket) y se perdería.
+  await page.evaluate(() => {
+    window.__voiceStates = [];
+    const seen = () => {
+      const el = document.querySelector('[data-testid="voice-call-status"]');
+      const t = el?.textContent?.trim();
+      if (t && window.__voiceStates[window.__voiceStates.length - 1] !== t) window.__voiceStates.push(t);
+    };
+    seen();
+    new MutationObserver(seen).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
   await page.getByRole("button", { name: START_BUTTON, exact: true }).click();
   const started = Date.now();
   // Condición de éxito: transcripción del usuario con la frase inyectada, seguida
@@ -318,6 +330,12 @@ try {
   assert(wsInfo.audioFrames > 0, `Llegó audio del agente (${wsInfo.audioFrames} frames)`);
   // Secuencia de estados: provisioning → (connecting) → connected → speaking, en ese orden.
   // "Conectando..." puede durar menos que el muestreo (200 ms), por eso es opcional.
+  // Orden de primera aparición según el observador (exacto), con el muestreo de respaldo.
+  const observed = await page.evaluate(() => window.__voiceStates || []).catch(() => []);
+  const firstSeen = [];
+  for (const l of observed) if (stateLabels.includes(l) && !firstSeen.includes(l)) firstSeen.push(l);
+  if (firstSeen.length) { stateOrder.length = 0; stateOrder.push(...firstSeen); }
+  console.log("  estados (observador):", observed.join(" → ") || "(ninguno)");
   const idx = (l) => stateOrder.indexOf(l);
   assert(idx("Preparando asistente IA...") === 0, `El primer estado fue provisioning (orden visto: ${stateOrder.join(" → ")})`);
   assert(idx("En llamada") > idx("Preparando asistente IA...") && (idx("Conectando...") === -1 || idx("Conectando...") < idx("En llamada")), "connected llegó después de provisioning/connecting");
