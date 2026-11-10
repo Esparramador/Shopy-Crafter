@@ -155,7 +155,12 @@ try {
   await page.getByTestId("convai-voice-tuning-source").filter({ hasText: "Guardado en el panel" }).waitFor({ timeout: 15_000 });
   ok("El badge de origen indica 'Guardado en el panel'");
   assert(!(await page.getByTestId("convai-voice-tuning-save-apply").isEnabled()), "Guardar y aplicar queda deshabilitado sin cambios en los controles");
-  assert(await page.getByTestId("convai-voice-tuning-apply-saved").isEnabled(), "Se puede volver a aplicar la configuración guardada sin cambios en los controles");
+  // Tras «Guardar y aplicar», el botón vuelve a habilitarse cuando termina la aplicación.
+  const applySavedEnabled = await page.waitForFunction(
+    () => { const b = document.querySelector('[data-testid="convai-voice-tuning-apply-saved"]'); return !!b && !b.disabled; },
+    null, { timeout: 30_000 },
+  ).then(() => true).catch(() => false);
+  assert(applySavedEnabled, "Se puede volver a aplicar la configuración guardada sin cambios en los controles");
   const putsBeforeSavedApply = voiceTuningPutCount;
   const savedApplyResp = page.waitForResponse(r => r.url().includes("/api/voice/convai/voice-settings/apply") && r.request().method() === "POST", { timeout: 60_000 });
   await page.getByTestId("convai-voice-tuning-apply-saved").click();
