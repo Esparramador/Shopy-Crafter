@@ -1,8 +1,11 @@
 import { Router } from "express";
-import { buildActionCatalogText } from "../lib/brain/catalog.js";
+import { isActionAllowed } from "../lib/brain/catalog.js";
+import {
+  BRAIN_TOOL_HEADER, BRAIN_TOOL_PROMPT_LINE, VOICE_ADMIN_PROMPT, ensureConvAIBrainTool, handleBrainToolCall,
+  loadBrain, signBrainToken, toSpoken, voiceClaudeModel,
+} from "../lib/convai-brain-tool.js";
 import { db, projectsTable, productsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
-import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
 import { enableLongRunning } from "../lib/long-running.js";
 import {
   synthesizeSpeech, listVoices, listAllVoices, cloneVoice, deleteClonedVoice, listClonedVoices,
@@ -210,86 +213,134 @@ router.get("/voice/voices", async (req, res): Promise<void> => {
   }
 });
 
+// ────────────────────────────────────────────────────────────
+// BOTÓN DE VOZ (micro del panel) → ShopyBrain
+// El texto reconocido va a brainRoute (puerta admin, canal voice-button) con el
+// catálogo único de acciones. `navigate` no es del catálogo: es una acción del
+// navegador (mover el panel a otra página), la ejecuta VoiceButton.tsx. Las demás
+// las ejecuta el navegador con POST /voice/command/execute (brainExecute), que
+// pide confirmación humana para las destructivas (fetchBrainAction).
+// ────────────────────────────────────────────────────────────
+
+/** Ruta interna del panel o null (nada de «//host», esquemas ni caracteres raros). */
+export function safePanelPath(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const p = v.trim();
+  if (p.length < 1 || p.length > 200 || !p.startsWith("/") || p.startsWith("//") || p.startsWith("/\\")) return null;
+  if (/[\s<>"'`\\]/.test(p) || /:/.test(p.split(/[?#]/)[0]!)) return null;
+  return p;
+}
+
+function voiceButtonPrompt(currentPage: string): string {
+  return `${VOICE_ADMIN_PROMPT}
+Página del panel en la que está ahora: ${currentPage}.
+
+ACCIÓN EXTRA DEL BOTÓN DE VOZ (la ejecuta el navegador, no el servidor):
+  - navigate: llevar al usuario a una página del panel. Params: {path} (ruta interna que empieza por /, p. ej. /admin, /projects/{projectId}, /projects/{projectId}/audit para la auditoría visual). Úsala cuando pida ir, abrir o ver una página.`;
+}
+
+const MAX_VOICE_ACTIONS = 3;
+
 router.post("/voice/command", requireAdmin, async (req, res): Promise<void> => {
   enableLongRunning(res);
-  try {
-    
-    const { transcript, projectId, currentPage } = req.body;
-  
-    if (!transcript) {
-      res.status(400).json({ error: "transcript required" });
-      return;
-    }
-  
-    let storeName = "tu tienda";
-    let activeProjectId: number | null = null;
-    if (projectId) {
-      activeProjectId = parseInt(projectId);
-      const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, activeProjectId));
-      if (project) storeName = project.name;
-    }
-  
-    const systemPrompt = `Eres el asistente de voz de Shopy Crafter (ShopyBrain). La tienda activa es: ${storeName}. Página actual: ${currentPage || "/admin"}.${activeProjectId ? ` ProjectId: ${activeProjectId}` : ""}
-  
-  Interpreta este comando de voz en español y devuelve:
-  1. Una respuesta hablada natural en español (max 2 frases, sin markdown, tono conversacional)
-  2. Una acción a ejecutar (si aplica)
-  
-  Acciones disponibles:
-${buildActionCatalogText("admin")}
-  - navigate: Navegar a página. Params: {path}
-  - navigate: Ir a /projects/{projectId}/audit para ver auditoría visual
-  
-  Devuelve SOLO JSON válido:
-  {
-    "response": "Respuesta hablada natural en español",
-    "action": {"type": "nombre_accion", "params": {...}} o null,
-    "confidence": 0.85
+  const { transcript, projectId, currentPage } = req.body ?? {};
+  if (typeof transcript !== "string" || !transcript.trim()) {
+    res.status(400).json({ error: "transcript required" });
+    return;
   }
-  
-  Si confidence < 0.6, pide aclaración. Nunca inventes datos.`;
-  
-    try {
-      const parsed = await askClaudeJsonWithBrain<{ response: string; action: { type: string; params: Record<string, unknown> } | null; confidence: number }>(
-        activeProjectId ?? 0,
-        transcript,
-        systemPrompt,
-        "general",
-        undefined,
-        16000,
-      );
-  
-      if (parsed.confidence >= 0.6 && parsed.action) {
-        learnFromOperation({
-          operationType: "voice_command",
-          title: `Voice: ${transcript.slice(0, 80)}`,
-          content: `Comando: "${transcript}". Acción: ${JSON.stringify(parsed.action)}. Respuesta: ${parsed.response?.slice(0, 200)}. Página: ${currentPage ?? "unknown"}.`,
-          confidence: parsed.confidence ?? 0.7,
-          tags: ["voice", "command", parsed.action?.type ?? "general"].filter(Boolean),
-        });
+  const page = typeof currentPage === "string" && currentPage ? currentPage.slice(0, 200) : "/admin";
+  const pid = parseInt(String(projectId ?? ""), 10);
+  try {
+    const { brainRoute } = await loadBrain();
+    const routed = await brainRoute({
+      text: transcript.trim().slice(0, 1000),
+      gate: "admin",
+      channel: "voice-button",
+      userId: (req.session as any)?.userId ?? null,
+      projectId: pid > 0 ? pid : null,
+      currentRoute: page,
+      // Latencia: motor rápido para voz (VOICE_BRAIN_CLAUDE_MODEL, por defecto Haiku).
+      engineMode: "claude",
+      models: { claude: voiceClaudeModel() },
+      systemPrompt: voiceButtonPrompt(page),
+    });
+
+    const actions: Array<{ type: string; params: Record<string, unknown>; executable: boolean }> = [];
+    for (const a of routed.actions) {
+      const type = String(a.action ?? "");
+      const params = a.params && typeof a.params === "object" ? a.params : {};
+      if (type === "navigate") {
+        const path = safePanelPath(params.path);
+        if (path) actions.push({ type, params: { path }, executable: false });
+      } else if (isActionAllowed(type, "admin")) {
+        actions.push({ type, params, executable: true });
       }
-  
-      res.json({
-        response: parsed?.response || "Entendido. ¿Puedes repetirlo?",
-        action: parsed?.action || null,
-        executed: false,
-        confidence: parsed?.confidence || 0.8,
-      });
-    } catch (e: unknown) {
-      if (!res.headersSent) {
-        res.status(500).json({
-          response: "Lo siento, hubo un error procesando tu comando.",
-          action: null,
-          executed: false,
-          confidence: 0,
-        });
-      }
+      if (actions.length >= MAX_VOICE_ACTIONS) break;
     }
-  } catch (err: any) {
+    const first = actions[0] ?? null;
+    res.json({
+      response: toSpoken(routed.text, 400) || (first ? "Entendido." : "Entendido. ¿Puedes repetirlo?"),
+      // Contrato de siempre (action/confidence) + la lista completa.
+      action: first ? { type: first.type, params: first.params } : null,
+      actions,
+      executable: !!first?.executable,
+      executed: false,
+      confidence: first ? 0.9 : 0.8,
+      engine: routed.engine,
+    });
+  } catch (err) {
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, "voice/command: brainRoute falló");
     if (!res.headersSent) {
-      const msg = err instanceof Error ? err.message : "Internal server error";
-      res.status(500).json({ error: msg });
+      res.status(500).json({
+        response: "Lo siento, hubo un error procesando tu comando.",
+        action: null,
+        actions: [],
+        executable: false,
+        executed: false,
+        confidence: 0,
+      });
     }
+  }
+});
+
+/** Ejecuta una acción del botón de voz (mismo contrato que /shopybrain/execute-action, canal voice-button). */
+router.post("/voice/command/execute", requireAdmin, async (req, res): Promise<void> => {
+  enableLongRunning(res);
+  try {
+    const { action, params } = req.body ?? {};
+    const { brainExecute } = await loadBrain();
+    const out = await brainExecute({
+      action: typeof action === "string" ? action : "",
+      params: params && typeof params === "object" ? params : {},
+      gate: "admin",
+      channel: "voice-button",
+      userId: (req.session as any)?.userId ?? null,
+      req,
+      res,
+    });
+    if (out.kind === "responded") return;
+    res.status(out.status).json(out.body);
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ error: err instanceof Error ? err.message : "Error ejecutando la acción" });
+  }
+});
+
+// ────────────────────────────────────────────────────────────
+// ARTURO → ShopyBrain: herramienta de servidor «consultar_shopybrain»
+// ElevenLabs llama aquí; la puerta la decide el agente (ruta + cabecera secreta
+// propia de cada tipo + brain_token firmado), nunca el texto.
+// ────────────────────────────────────────────────────────────
+router.post("/voice/convai/brain-tool/:kind", async (req, res): Promise<void> => {
+  try {
+    const out = await handleBrainToolCall({
+      kind: String(req.params.kind ?? ""),
+      secretHeader: req.get(BRAIN_TOOL_HEADER) ?? undefined,
+      body: req.body,
+    });
+    res.status(out.status).json(out.body);
+  } catch (err) {
+    logger.error({ err: err instanceof Error ? err.message : String(err) }, "convai brain-tool failed");
+    if (!res.headersSent) res.status(500).json({ respuesta: "Ahora mismo no puedo consultarlo." });
   }
 });
 
@@ -894,15 +945,33 @@ async function agentConfigFor(type: AgentType, voiceId: string): Promise<ConvAIA
     speed: ttsSettings.speed,
   };
 
+  // Herramienta «consultar_shopybrain» (webhook a ShopyBrain). Si no se puede
+  // instalar (sin ELEVEN_BRAIN_TOOL_SECRET, sin URL pública o ElevenLabs falla),
+  // el agente se sincroniza igual, sin ella: una llamada sin herramienta es mejor
+  // que ninguna llamada.
+  let brainToolId: string | null = null;
+  try {
+    brainToolId = await ensureConvAIBrainTool(type);
+  } catch (err) {
+    logger.warn({ type, err: (err as Error)?.message }, "ConvAI: no se pudo preparar consultar_shopybrain; el agente sigue sin ella");
+  }
+  const placeholders: Record<string, string> = {};
+  if (type === "client") placeholders.store_context = "Sin datos disponibles de la tienda en este momento.";
+  // El token lo rellena la plataforma al abrir la llamada (call-url); vacío = la herramienta responde que no puede.
+  if (brainToolId && type !== "landing") placeholders.brain_token = "";
+
   return {
     name: names[type],
     conversation_config: {
       agent: {
-        prompt: { prompt: prompts[type] },
+        prompt: {
+          prompt: prompts[type] + (brainToolId ? BRAIN_TOOL_PROMPT_LINE[type] : ""),
+          ...(brainToolId ? { tool_ids: [brainToolId] } : {}),
+        },
         first_message: first[type],
         language: "es",
-        ...(type === "client"
-          ? { dynamic_variables: { dynamic_variable_placeholders: { store_context: "Sin datos disponibles de la tienda en este momento." } } }
+        ...(Object.keys(placeholders).length
+          ? { dynamic_variables: { dynamic_variable_placeholders: placeholders } }
           : {}),
       },
       // The browser downsamples the microphone to PCM16 @ 16 kHz; pin the ASR
@@ -1080,7 +1149,9 @@ router.get("/voice/convai/call-url", requireAdmin, async (req, res): Promise<voi
   try {
     const agentId = (req.query.agentId as string) || await getOrCreateConvAIAgent("admin");
     const signed_url = await getConvAISignedUrl(agentId);
-    res.json({ signed_url, agentId });
+    // brain_token: la herramienta consultar_shopybrain solo abre la puerta admin con él.
+    const brain_token = signBrainToken({ kind: "admin", userId: (req.session as any)?.userId ?? null });
+    res.json({ signed_url, agentId, ...(brain_token ? { dynamic_variables: { brain_token } } : {}) });
   } catch (err: any) {
     logger.error({ err: err?.message, code: err?.code }, "convai/call-url failed");
     respondCallUrlError(res, err, "Error obteniendo URL de llamada");
@@ -1144,7 +1215,10 @@ router.get("/voice/client-call-url", async (req, res): Promise<void> => {
     const session = req.session as any;
     const pid = Number(session.role === "admin" ? req.query.pid : session.clientId);
     const store_context = Number.isInteger(pid) && pid > 0 ? await buildClientStoreContext(pid) : "Sin proyecto vinculado.";
-    res.json({ signed_url, agentId, mode: "client", dynamic_variables: { store_context } });
+    // brain_token firmado con el proyecto de la sesión: la herramienta consultar_shopybrain
+    // toma el proyecto de aquí (un cliente no puede cambiarlo tocando sus dynamic_variables).
+    const brain_token = Number.isInteger(pid) && pid > 0 ? signBrainToken({ kind: "client", projectId: pid, userId }) : null;
+    res.json({ signed_url, agentId, mode: "client", dynamic_variables: { store_context, ...(brain_token ? { brain_token } : {}) } });
   } catch (err: any) {
     logger.error({ err: err?.message, code: err?.code }, "client-call-url failed");
     respondCallUrlError(res, err, "Error obteniendo URL de llamada");
