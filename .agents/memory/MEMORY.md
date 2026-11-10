@@ -79,3 +79,4 @@
 - [Admin modal overlay convention](admin-modal-overlay.md) — wrap admin modals in <ModalOverlay> (hook+.modal-overlay); FAB is z 9990 so z-index races lose; add new pages to e2e PAGES.
 - [Public offer requirements](public-offer-scope.md) — distinguish development projects, artistic QR vs animated gifts, normal scrolling and four packs including custom.
 - [Artistic QR validation](artistic-qr-validation.md) — verify consistent payloads at native and reduced sizes; one decoder or one successful size is not enough.
+- [Contact pre-report provenance](contact-prereport-provenance.md) — record the provider that actually answered and count a website as verified only after a successful non-empty fetch.

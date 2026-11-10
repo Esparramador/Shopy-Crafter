@@ -102,3 +102,38 @@ Consultas autenticadas de lectura al endpoint de modelo; no se crearon prediccio
 - `GET /api/voice/convai/voice-settings`: HTTP 200; `stability=0.5`, `similarityBoost=0.8`, `speed=1.2`.
 - `GET /api/voice/convai/health`: HTTP 200; `healthy=true`, `degraded=false`; admin, cliente y landing en `ok`.
 - `GET /api/voice/convai/orphans`: HTTP 200; los cuatro IDs borrados ausentes y el agente ShopyBrain preservado.
+
+## Pre-Informe de contacto — prueba real en desarrollo
+
+### Primera ejecución y causa raíz
+
+- Se enviaron ambos formularios reales con `https://musclefactory.es`. En desarrollo, ese dominio no resolvió: `getaddrinfo ENOTFOUND musclefactory.es`. Aun sin scraping, las dos solicitudes se dieron por completadas y se enviaron por correo: A creó el informe 1513 (217.312 bytes) y B el 1514 (219.012 bytes); ambos trabajos quedaron `completed`, intento 1, `email_status=sent`, sin error guardado.
+- El informe 1513 afirmó sin evidencia que había «56 productos activos sin stock» y recomendó cambiar el inventario. No se había podido consultar la tienda, así que esa afirmación no estaba respaldada. Los informes 1513 y 1514 y sus correos permanecen; no se borraron ni se pueden retirar de los buzones.
+- La configuración de desarrollo del proyecto Muscle Factory indica `https://musclefactorybcn.com`. El scraper de la aplicación y una consulta pública de lectura respondieron HTTP 200. Se extrajeron 162 palabras, título `Muscle Factory BCN - Más que una tienda online`, meta description de 121 caracteres, H1 `Muscle Factory BCN`, 29 H2, 76 imágenes (21 sin `alt`), 1 JSON-LD, y presencia de `robots.txt`, sitemap y SSL.
+
+### Repetición desde los formularios públicos
+
+Se repitieron A desde `/#fp-contact` y B desde `/contacto`, usando el dominio público configurado del proyecto, el nicho `suplementación deportiva` y el correo de pruebas `prueba+prereport@shopycrafter.com`. Ambos envíos recibieron HTTP 200; no hubo errores JavaScript ni casillas obligatorias pendientes.
+
+| Envío | Confirmación visible al visitante | Trabajo en cola | Informe guardado |
+|---|---|---|---|
+| A — portada | `¡Solicitud recibida!` | `completed`; 1 intento; informe `completed`; correo `sent`; sin error. ID de envío: `lead_form_dc6f25b0b36ba4bdbea70e143217bbf75ba236ecfd8b7b9b63a160d275b3a1b0`. | ID 1515; 216.336 bytes. |
+| B — `/contacto` | `✅ ¡Solicitud recibida! Hemos recibido tu solicitud. Te contactaremos con una propuesta por escrito antes de empezar.` | `completed`; 1 intento; informe `completed`; correo `sent`; sin error. ID de envío: `lead_form_f00b49e4df23fa0ee3ef8812d4c7bc491c4e53ac98082224dc45f80279e0f4c2`. | ID 1516; 215.782 bytes. |
+
+La API devolvió en ambos casos: `¡Solicitud recibida! Estamos analizando tu negocio con IA. Recibirás noticias nuestras muy pronto.`
+
+### Contenido, motores y correo
+
+- Los informes 1515 y 1516 contienen las cuatro secciones de negocio, mercado, SEO y proveedores; ninguna contiene los marcadores `Error en…`. El SEO cita datos extraídos de la página pública. No afirman que se haya leído el catálogo privado ni se haya verificado stock, ventas o métricas internas. Las métricas de mercado, márgenes y proveedores se identifican como estimaciones o recomendaciones sectoriales; B indica expresamente que el número de SKU y el stock no son verificables con la evidencia disponible.
+- La atribución persistida y los registros del servidor coinciden: **Claude (`claude-anthropic`)** generó negocio, mercado, SEO y proveedores en A y B. Claude también formateó esas cuatro secciones y generó las métricas sectoriales y el producto de muestra. No hubo secciones servidas por Gemini.
+- El sender del pre-informe registró `Gmail: email sent successfully`; ambos trabajos acabaron con `email_status=sent`. La búsqueda de solo lectura para recuperar los IDs de Gmail respondió HTTP 403, `Request had insufficient authentication scopes`. No se reenvió ningún correo para obtener esos IDs.
+- La generación de imagen opcional del producto de muestra no tuvo crédito de Replicate: `black-forest-labs/flux-1.1-pro` y `black-forest-labs/flux-schnell` respondieron HTTP 402 `Insufficient credit`; `google/nano-banana` respondió HTTP 429 por límite de solicitudes. La ficha de muestra y los informes de texto sí se guardaron y enviaron.
+
+### Cambios y verificación
+
+- Se corrigió el registro del motor para guardar el proveedor que realmente respondió en cada sección, incluso cuando una función de Gemini usa Claude como respaldo. La atribución se conserva al guardar y recuperar el trabajo.
+- Se reforzaron las reglas de evidencia del pre-informe: solo una página pública obtenida con HTTP exitoso y texto no vacío cuenta como fuente; no se atribuyen al negocio datos que no aparezcan en el contenido consultado; se distinguen los datos declarados, las observaciones web y las estimaciones; y el formateador no debe añadir hechos nuevos. También se evita marcar como ausente un metadato SEO cuando la web no pudo analizarse.
+- Causa del fallo original: la web de prueba no resolvía y el prompt anterior no impedía afirmar inventario no observado. La prueba se repitió con el dominio real del proyecto y ambos informes corregidos terminaron y se enviaron.
+- Pruebas focalizadas del worker y atribución: **8 pasaron**. El workflow del API se reconstruyó y reinició; `GET /api/healthz` respondió HTTP 200 (`{"status":"ok"}`).
+- El typecheck del API sigue fallando por dos errores ajenos a estos cambios: `fusion-studio-pro.ts:1353` pasa `gen4.5` donde `RunwayModel` espera `gen4_5`, y `provider-health.ts:312` usa el identificador inexistente `checkOpenai`. No se modificaron esos archivos.
+- No se tocó producción ni se publicó. Los cuatro envíos de prueba (dos iniciales y dos corregidos) crearon trabajos y enviaron correos; los dos primeros informes con la URL que no resolvía se conservan como antecedentes y no deben usarse como análisis verificado.
