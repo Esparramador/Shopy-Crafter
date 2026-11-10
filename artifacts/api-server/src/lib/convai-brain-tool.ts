@@ -30,6 +30,7 @@ import { logger } from "./logger.js";
 import { DESTRUCTIVE_ACTIONS } from "./shopybrain-helpers.js";
 import { isActionAllowed, type BrainGate } from "./brain/catalog.js";
 import { recordBrainEvent } from "./brain/events.js";
+import { pickModelSync } from "./ai-models.js";
 import type { BrainProposedAction } from "./brain/router.js";
 
 // brainRoute/brainExecute se cargan al usarse: execute.ts arrastra módulos con
@@ -218,9 +219,10 @@ Responde en español, en una o dos frases, sin markdown, sin listas, sin emojis 
 El texto viene de un reconocedor de voz y puede traer errores: interpreta la intención; si no la entiendes, pide que lo repitan y no propongas acciones.
 Si la petición es una acción del catálogo, propón SOLO la principal con su bloque de acción. Nunca inventes datos ni digas que algo está hecho: lo hace la acción.`;
 
-/** Modelo rápido para la voz (latencia antes que profundidad). */
+/** Modelo rápido para la voz (latencia antes que profundidad): el tier «fast»
+ *  de Claude que se elige en el panel de modelos, salvo VOICE_BRAIN_CLAUDE_MODEL. */
 export function voiceClaudeModel(): string {
-  return process.env.VOICE_BRAIN_CLAUDE_MODEL?.trim() || "claude-haiku-4-5";
+  return process.env.VOICE_BRAIN_CLAUDE_MODEL?.trim() || pickModelSync("claude", "fast");
 }
 
 /** Texto apto para voz: sin markdown y corto, cortado en una frase. */
