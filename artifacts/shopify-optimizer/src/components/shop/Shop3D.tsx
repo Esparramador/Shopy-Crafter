@@ -204,7 +204,7 @@ export function ProductPreview3D({ shape, image, alt }: { shape: PreviewShape; i
   if (!ok) return <div className="shop-preview-empty">Tu navegador no muestra 3D. Te enviaremos la prueba antes de grabar.</div>;
   return (
     <GLBoundary fallback={<div className="shop-preview-empty">No se pudo mostrar la vista 3D. Te enviaremos la prueba antes de grabar.</div>}>
-      <Canvas className="shop-preview-canvas" dpr={[1, 1.75]} camera={{ position: [0, 0, 18], fov: 35 }} gl={{ antialias: true, alpha: true }} aria-label={alt}>
+      <Canvas className="shop-preview-canvas" dpr={[1, 1.75]} camera={{ position: [0, 0, 18], fov: 35 }} gl={{ antialias: true, alpha: true }} frameloop={prefersReduced() ? "demand" : "always"} aria-label={alt}>
         <ambientLight intensity={0.4} />
         <directionalLight position={[4, 6, 8]} intensity={1.1} />
         <Suspense fallback={null}>

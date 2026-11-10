@@ -1,9 +1,9 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import SiteLinks from "@/components/SiteLinks";
-import { assetUrl, useCart } from "./shop-api";
+import { assetUrl, fromPrice, loadCatalog, useCart } from "./shop-api";
 import { CART_BUMP, prefersReduced } from "./shop-motion";
 import CartDrawer from "./CartDrawer";
 import "./shop.css";
@@ -15,9 +15,18 @@ export default function ShopLayout({ children }: { children: ReactNode }) {
   const items = useCart();
   const count = items.length;
   const [path, navigate] = useLocation();
+  const [cardFromCents, setCardFromCents] = useState<number | null>(null);
   const cartBtn = useRef<HTMLAnchorElement>(null);
   const progress = useRef<HTMLDivElement>(null);
   useEffect(() => { window.scrollTo(0, 0); }, []);
+  useEffect(() => {
+    let alive = true;
+    loadCatalog().then(catalog => {
+      const cards = catalog.products.find(product => product.slug === "tarjetas-metalicas");
+      if (alive && cards) setCardFromCents(fromPrice(cards).cents);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   const goBack = () => {
     const referrer = document.referrer;
@@ -52,7 +61,7 @@ export default function ShopLayout({ children }: { children: ReactNode }) {
 
   // Línea dorada de progreso de lectura bajo la cabecera.
   useEffect(() => {
-    if (!progress.current) return;
+    if (!progress.current || prefersReduced()) return;
     const st = ScrollTrigger.create({
       start: 0, end: "max",
       onUpdate: self => { if (progress.current) progress.current.style.transform = `scaleX(${self.progress})`; },
@@ -64,7 +73,7 @@ export default function ShopLayout({ children }: { children: ReactNode }) {
     <div className="shop-root">
       <a href="#shop-main" className="shop-skip">Saltar al contenido</a>
       {!/\/tienda\/(carrito|gracias)/.test(typeof window !== "undefined" ? window.location.pathname : "") && <Link href="/tienda/tarjetas-metalicas" className="shop-promo">
-        <span>✦ Tarjetas de visita de aluminio desde <b>0,45 €</b></span>
+        <span>✦ Tarjetas de visita de aluminio{cardFromCents !== null && <> desde <b>{(cardFromCents / 100).toLocaleString("es-ES", { style: "currency", currency: "EUR" })}</b></>}</span>
         <span className="shop-promo-sep" aria-hidden="true">·</span>
         <span>Envío gratis desde 60 €</span>
         <span className="shop-promo-go">Pedir ahora →</span>
