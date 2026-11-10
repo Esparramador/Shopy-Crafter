@@ -18,6 +18,8 @@ const PREVIOUS_HREFS = [
   "/admin/gemini-intel", "/admin/inventory", "/admin/competitors", "/admin/forecast", "/admin/achievements",
   "/admin/roadmap", "/admin/apk", "/tienda", "/admin/ai-catalog", "/admin/api-usage", "/admin/system",
   "/help/connections",
+  // Añadidos después de la reorganización:
+  "/admin/cerebro",
 ];
 
 describe("menú del panel", () => {

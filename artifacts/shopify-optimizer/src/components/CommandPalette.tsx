@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { Search } from "lucide-react";
+import { Search, Sparkles, MessageSquare, CornerDownLeft } from "lucide-react";
+import { askBrain, type BrainAnswer as Answer } from "@/lib/brain-ask";
+import { BrainAnswer, BrainAnswerSkeleton } from "@/components/brain/BrainAnswer";
+import "@/components/brain/brain.css";
 
 const COMMANDS = [
   { id: "home", label: "Panel Admin", icon: "🏠", path: "/home", category: "Admin" },
@@ -13,6 +16,7 @@ const COMMANDS = [
   { id: "forecast", label: "Predicciones ML", icon: "🔮", path: "/admin/forecast", category: "IA" },
   { id: "prompt-library", label: "Librería de Prompts", icon: "📝", path: "/admin/prompt-library", category: "IA" },
   { id: "shopybrain-memories", label: "ShopyBrain Memorias", icon: "🧠", path: "/admin/shopybrain/memories", category: "IA" },
+  { id: "cerebro", label: "Cerebro: lo que entra por cada puerta", icon: "✦", path: "/admin/cerebro", category: "IA" },
   { id: "shopybrain-insights", label: "ShopyBrain Insights", icon: "💡", path: "/admin/shopybrain/insights", category: "IA" },
   { id: "achievements", label: "Logros", icon: "🏆", path: "/admin/achievements", category: "Herramientas" },
   { id: "roadmap", label: "Plan 30-60-90", icon: "🗺", path: "/admin/roadmap", category: "Herramientas" },
@@ -38,8 +42,38 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
+  // Lo que no es una página va al cerebro: «Preguntar a ShopyBrain».
+  const [brain, setBrain] = useState<{ query: string; loading: boolean; answer: Answer | null; error: string } | null>(null);
+  const brainAbort = useRef<AbortController | null>(null);
+
+  const closePalette = () => {
+    brainAbort.current?.abort();
+    setOpen(false);
+  };
+
+  const ask = async (q: string) => {
+    const text = q.trim();
+    if (!text) return;
+    brainAbort.current?.abort();
+    const ctrl = new AbortController();
+    brainAbort.current = ctrl;
+    setBrain({ query: text, loading: true, answer: null, error: "" });
+    try {
+      const projectId = location.match(/\/projects\/(\d+)/)?.[1];
+      const answer = await askBrain(text, { channel: "command_palette", currentRoute: location, activeProjectId: projectId, signal: ctrl.signal });
+      if (!ctrl.signal.aborted) setBrain({ query: text, loading: false, answer, error: "" });
+    } catch (e) {
+      if (ctrl.signal.aborted) return;
+      setBrain({ query: text, loading: false, answer: null, error: e instanceof Error ? e.message : "ShopyBrain no ha podido responder" });
+    }
+  };
+
+  const continueInChat = (text: string) => {
+    window.dispatchEvent(new CustomEvent("shopycrafter:chatbot", { detail: { message: text } }));
+    closePalette();
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -48,10 +82,12 @@ export function CommandPalette() {
         setOpen(o => !o);
         setQuery("");
         setSelected(0);
+        setBrain(null);
       }
-      if (e.key === "Escape") setOpen(false);
-      if (e.key === "?" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)) {
+      if (e.key === "Escape") { brainAbort.current?.abort(); setOpen(false); }
+      if (e.key === "?" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName) && !(e.target as HTMLElement).isContentEditable) {
         setOpen(o => !o);
+        setBrain(null);
       }
     };
     window.addEventListener("keydown", handler);
@@ -67,12 +103,21 @@ export function CommandPalette() {
     c.path.toLowerCase().includes(query.toLowerCase())
   );
 
+  // La última opción, si hay texto, es preguntar al cerebro.
+  const canAsk = query.trim().length > 1;
+  const total = filtered.length + (canAsk ? 1 : 0);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown") { e.preventDefault(); setSelected(s => Math.min(s + 1, filtered.length - 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setSelected(s => Math.min(s + 1, total - 1)); }
     if (e.key === "ArrowUp") { e.preventDefault(); setSelected(s => Math.max(s - 1, 0)); }
-    if (e.key === "Enter" && filtered[selected]) {
-      navigate(filtered[selected].path);
-      setOpen(false);
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (filtered[selected]) {
+        navigate(filtered[selected].path);
+        closePalette();
+      } else if (canAsk) {
+        void ask(query);
+      }
     }
   };
 
@@ -86,7 +131,7 @@ export function CommandPalette() {
         display: "flex", alignItems: "flex-start", justifyContent: "center",
         paddingTop: "15vh",
       }}
-      onClick={() => setOpen(false)}
+      onClick={closePalette}
     >
       <div
         style={{
@@ -102,9 +147,9 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             value={query}
-            onChange={e => { setQuery(e.target.value); setSelected(0); }}
+            onChange={e => { setQuery(e.target.value); setSelected(0); setBrain(null); }}
             onKeyDown={handleKeyDown}
-            placeholder="Buscar páginas, acciones..."
+            placeholder="Busca una página o pregunta a ShopyBrain…"
             style={{
               flex: 1, background: "none", border: "none", outline: "none",
               fontSize: 16, color: "var(--t)", caretColor: "var(--gold)",
@@ -119,16 +164,43 @@ export function CommandPalette() {
           </div>
         </div>
 
-        <div style={{ maxHeight: 360, overflowY: "auto" }}>
-          {filtered.length === 0 ? (
+        {brain ? (
+          <div className="brain-palette-body">
+            {brain.loading && <BrainAnswerSkeleton label={`Preguntando a ShopyBrain: «${brain.query}»`} />}
+            {brain.error && (
+              <div className="brain-answer">
+                <div className="brain-ev-detail is-err">{brain.error}</div>
+                <div className="brain-palette-foot">
+                  <button type="button" className="btn btn-sm btn-gold" onClick={() => ask(brain.query)}>Reintentar</button>
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => continueInChat(brain.query)}><MessageSquare size={13} /> Llevar al chat</button>
+                </div>
+              </div>
+            )}
+            {brain.answer && (
+              <BrainAnswer
+                answer={brain.answer}
+                extra={(
+                  <div className="brain-palette-foot">
+                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => continueInChat(brain.query)}><MessageSquare size={13} /> Seguir en el chat</button>
+                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => { setBrain(null); inputRef.current?.focus(); }}>Volver a la lista</button>
+                  </div>
+                )}
+              />
+            )}
+          </div>
+        ) : (
+        <div style={{ maxHeight: 360, overflowY: "auto" }} role="listbox" aria-label="Resultados">
+          {filtered.length === 0 && !canAsk ? (
             <div style={{ padding: "32px", textAlign: "center", color: "var(--t3)", fontSize: 14 }}>
-              Sin resultados para "{query}"
+              Escribe para buscar una página o preguntar a ShopyBrain
             </div>
           ) : (
             filtered.map((cmd, i) => (
               <div
                 key={cmd.id}
-                onClick={() => { navigate(cmd.path); setOpen(false); }}
+                role="option"
+                aria-selected={selected === i}
+                onClick={() => { navigate(cmd.path); closePalette(); }}
                 style={{
                   padding: "12px 18px",
                   display: "flex", alignItems: "center", gap: 12,
@@ -150,7 +222,26 @@ export function CommandPalette() {
               </div>
             ))
           )}
+          {canAsk && (
+            <div
+              role="option"
+              aria-selected={selected === filtered.length}
+              className={`brain-palette-ask${selected === filtered.length ? " is-selected" : ""}`}
+              onClick={() => ask(query)}
+              onMouseEnter={() => setSelected(filtered.length)}
+            >
+              <span className="brain-answer-orb" aria-hidden="true"><Sparkles size={13} /></span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p className="brain-palette-ask-q">Preguntar a <strong>ShopyBrain</strong>: «{query.trim()}»</p>
+                <p style={{ fontSize: 11, color: "var(--t4)", marginTop: 2 }}>
+                  {filtered.length === 0 ? "No es ninguna página: el cerebro responde o lo hace" : "Responde, busca o ejecuta una acción"}
+                </p>
+              </div>
+              <CornerDownLeft size={14} style={{ color: "var(--t3)", flexShrink: 0 }} />
+            </div>
+          )}
         </div>
+        )}
 
         <div style={{ padding: "10px 18px", borderTop: "1px solid var(--ink3)", display: "flex", gap: 16 }}>
           {[

@@ -24,6 +24,7 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
   {
     id: "cerebro", title: "Cerebro IA", icon: "🧠", items: [
       { label: "Centro Shopy Crafter", icon: "🧠", href: "/admin/shopybrain" },
+      { label: "Cerebro: lo que entra", icon: "✦", href: "/admin/cerebro" },
       { label: "Memorias", icon: "💾", href: "/admin/shopybrain/memories" },
       { label: "Knowledge Domains", icon: "🔬", href: "/admin/shopybrain/insights" },
       { label: "Sesiones Estudio", icon: "📚", href: "/admin/shopybrain/study" },
