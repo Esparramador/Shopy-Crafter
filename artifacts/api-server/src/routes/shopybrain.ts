@@ -12,7 +12,7 @@ import { getPlatform } from "../lib/platform-capabilities.js";
 import { brainRoute, BRAIN_ENGINE_MODES, type BrainEngineMode } from "../lib/brain/router.js";
 import { brainExecute } from "../lib/brain/execute.js";
 import { getBrainCatalog, isBrainGate } from "../lib/brain/catalog.js";
-import { listBrainEvents } from "../lib/brain/events.js";
+import { listBrainEventChannels, listBrainEvents } from "../lib/brain/events.js";
 
 import {
   handleRouteError, upload, studySessionSchema, DOMAIN_LABELS, ensureDomains
@@ -241,15 +241,25 @@ router.get("/shopybrain/catalog", requireAdmin, (req, res): void => {
   res.json({ gate: gate ?? null, actions: getBrainCatalog(gate) });
 });
 
-// GET /shopybrain/events?gate=public&limit=50&before=1234
+// GET /shopybrain/events/channels — canales con eventos (filtro del panel «Cerebro»).
+router.get("/shopybrain/events/channels", requireAdmin, async (_req, res): Promise<void> => {
+  try {
+    res.json({ channels: await listBrainEventChannels() });
+  } catch (err: any) {
+    handleRouteError(res, err);
+  }
+});
+
+// GET /shopybrain/events?gate=public&channel=landing_chat&limit=50&before=1234
 // Lo que ha entrado por cada puerta y qué decidió el cerebro (tabla brain_events), del más nuevo al más viejo.
 router.get("/shopybrain/events", requireAdmin, async (req, res): Promise<void> => {
   try {
     const gate = req.query.gate === undefined || req.query.gate === "" ? undefined : req.query.gate;
     if (gate !== undefined && !isBrainGate(gate)) { res.status(400).json({ error: "gate no válida (admin, client o public)" }); return; }
+    const channel = typeof req.query.channel === "string" && req.query.channel ? req.query.channel.slice(0, 60) : undefined;
     const limit = req.query.limit === undefined ? undefined : parseInt(String(req.query.limit), 10);
     const before = req.query.before === undefined ? undefined : parseInt(String(req.query.before), 10);
-    res.json(await listBrainEvents({ gate, limit: Number.isFinite(limit) ? limit : undefined, before: Number.isFinite(before) ? before : undefined }));
+    res.json(await listBrainEvents({ gate, channel, limit: Number.isFinite(limit) ? limit : undefined, before: Number.isFinite(before) ? before : undefined }));
   } catch (err: any) {
     handleRouteError(res, err);
   }

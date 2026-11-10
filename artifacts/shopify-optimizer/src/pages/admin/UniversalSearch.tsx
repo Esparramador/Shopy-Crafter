@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import{ Search, Globe, Instagram, Store, ExternalLink, Loader2, Download, Clock, ChevronRight, Sparkles, Building2, ArrowRight, Eye }from "lucide-react";
 import { useListProjects } from "@workspace/api-client-react";
+import { askBrain, type BrainAnswer as Answer } from "@/lib/brain-ask";
+import { BrainAnswer, BrainAnswerSkeleton } from "@/components/brain/BrainAnswer";
 
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -48,8 +50,39 @@ export default function UniversalSearch() {
     return { icon: Building2, label: "Marca / Empresa", color: "#c8a84b" };
   };
 
+  // Todo pasa primero por el cerebro (/search). Si detecta una marca, web o @cuenta,
+  // se ofrece la investigación de entidad de siempre (y se lanza sola si lo escrito
+  // es solo una URL o una cuenta, como antes).
+  const [brainLoading, setBrainLoading] = useState(false);
+  const [brain, setBrain] = useState<{ query: string; answer: Answer } | null>(null);
+
+  const researchTarget = (query: string, answer: Answer): string | null => {
+    if (!answer.potentialEntity) return null;
+    const single = !/\s/.test(query.trim());
+    return single && detectInputType(query).label !== "Marca / Empresa" ? query.trim() : answer.potentialEntity;
+  };
+
   const handleSearch = async () => {
-    if (!input.trim()) return;
+    const query = input.trim();
+    if (!query) return;
+    setBrainLoading(true);
+    setError("");
+    setResult(null);
+    setBrain(null);
+    try {
+      const answer = await askBrain(query, { channel: "universal_search", activeProjectId: activeProjectId || undefined, niche: niche.trim() || undefined, currentRoute: "/admin/search" });
+      setBrain({ query, answer });
+      const target = researchTarget(query, answer);
+      if (target && !/\s/.test(query) && detectInputType(query).label !== "Marca / Empresa") void runResearch(target);
+    } catch (err: any) {
+      setError(err.message || "ShopyBrain no ha podido responder");
+    } finally {
+      setBrainLoading(false);
+    }
+  };
+
+  const runResearch = async (target: string) => {
+    if (!target.trim()) return;
     setLoading(true);
     setError("");
     setResult(null);
@@ -60,7 +93,7 @@ export default function UniversalSearch() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          input: input.trim(),
+          input: target.trim(),
           niche: niche.trim() || undefined,
           market: "es",
           projectId: activeProjectId || undefined,
@@ -76,8 +109,8 @@ export default function UniversalSearch() {
       setResult(data);
 
       saveRecent({
-        input: input.trim(),
-        entityName: data.entity?.name || input.trim(),
+        input: target.trim(),
+        entityName: data.entity?.name || target.trim(),
         date: new Date().toISOString(),
         fileId: data.savedFileId,
       });
@@ -89,7 +122,7 @@ export default function UniversalSearch() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !loading) handleSearch();
+    if (e.key === "Enter" && !loading && !brainLoading) handleSearch();
   };
 
   const inputType = detectInputType(input);
@@ -103,7 +136,7 @@ export default function UniversalSearch() {
           Buscador Universal
         </h1>
         <p style={{ fontSize: 14, color: "#8b8b9e", marginTop: 6 }}>
-          Busca y analiza cualquier tienda, URL, Instagram o marca. Sin necesidad de tener un proyecto activo.
+          Pregunta lo que sea a ShopyBrain o analiza cualquier tienda, URL, Instagram o marca. Sin necesidad de tener un proyecto activo.
         </p>
       </div>
 
@@ -123,7 +156,7 @@ export default function UniversalSearch() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="URL, tienda Shopify, @instagram, nombre de marca..."
+              placeholder="Pregunta, URL, tienda Shopify, @instagram, marca..."
               style={{
                 flex: 1, background: "none", border: "none", color: "#f5f5f7",
                 fontSize: 15, padding: "14px 0", outline: "none",
@@ -152,7 +185,7 @@ export default function UniversalSearch() {
           />
           <button
             onClick={handleSearch}
-            disabled={loading || !input.trim()}
+            disabled={loading || brainLoading || !input.trim()}
             style={{
               background: loading ? "#333" : "linear-gradient(135deg, #c4956a, #a07850)",
               border: "none", borderRadius: 12, padding: "14px 24px", cursor: loading ? "default" : "pointer",
@@ -160,8 +193,8 @@ export default function UniversalSearch() {
               opacity: !input.trim() ? 0.5 : 1, whiteSpace: "nowrap",
             }}
           >
-            {loading ? <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> : <Search size={18} />}
-            {loading ? "Analizando..." : "Buscar"}
+            {loading || brainLoading ? <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} /> : <Search size={18} />}
+            {brainLoading ? "Preguntando..." : loading ? "Analizando..." : "Buscar"}
           </button>
         </div>
 
@@ -189,6 +222,34 @@ export default function UniversalSearch() {
           ))}
         </div>
       </div>
+
+      {brainLoading && (
+        <div className="card" style={{ marginBottom: 24, padding: 20, borderRadius: "var(--r4)" }}>
+          <BrainAnswerSkeleton label={`Preguntando a ShopyBrain: «${input.trim()}»`} />
+        </div>
+      )}
+
+      {brain && !brainLoading && (() => {
+        const target = researchTarget(brain.query, brain.answer);
+        return (
+          <div className="card" style={{ marginBottom: 24, padding: 20, borderRadius: "var(--r4)" }}>
+            <BrainAnswer
+              key={brain.query}
+              answer={brain.answer}
+              extra={target && !result && !loading ? (
+                <div className="brain-action-row">
+                  <Sparkles size={15} style={{ color: "var(--gold)", flexShrink: 0 }} />
+                  <span className="brain-action-name">Investigar a fondo «{target}»</span>
+                  <span className="brain-action-params">Google, redes, SEO y competencia; se guarda en la Bóveda Global</span>
+                  <button type="button" className="btn btn-sm btn-gold" onClick={() => runResearch(target)}>
+                    <Search size={13} /> Investigar
+                  </button>
+                </div>
+              ) : null}
+            />
+          </div>
+        );
+      })()}
 
       {loading && (
         <div style={{
@@ -354,7 +415,7 @@ export default function UniversalSearch() {
         </div>
       )}
 
-      {!loading && !result && recentSearches.length > 0 && (
+      {!loading && !brainLoading && !result && !brain && recentSearches.length > 0 && (
         <div style={{
           background: "#111118", border: "1px solid #1e1e2e", borderRadius: 14, padding: 20,
         }}>
@@ -395,7 +456,7 @@ export default function UniversalSearch() {
         </div>
       )}
 
-      {!loading && !result && recentSearches.length === 0 && (
+      {!loading && !brainLoading && !result && !brain && recentSearches.length === 0 && (
         <div style={{
           background: "#111118", border: "1px solid #1e1e2e", borderRadius: 14,
           padding: 40, textAlign: "center",

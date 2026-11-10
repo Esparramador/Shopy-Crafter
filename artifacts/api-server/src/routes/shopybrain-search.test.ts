@@ -133,6 +133,15 @@ describe("GET /shopybrain/events y /catalog", () => {
     expect((await fetch(`${base}/shopybrain/events?gate=root`)).status).toBe(400);
   });
 
+  it("filtra por canal", async () => {
+    fakeBrainDb.seed(brainEventsTable, [
+      { id: 5, gate: "admin", channel: "studio-fusion", kind: "execute", status: "ok" },
+      { id: 4, gate: "admin", channel: "admin_chat", kind: "answer", status: "ok" },
+    ]);
+    const r = await (await fetch(`${base}/shopybrain/events?channel=studio-fusion`)).json();
+    expect(r.events.map((e: { id: number }) => e.id)).toEqual([5]);
+  });
+
   it("el catálogo por puerta", async () => {
     const r = await (await fetch(`${base}/shopybrain/catalog?gate=public`)).json();
     expect(r.actions.map((a: { name: string }) => a.name)).toEqual(["create_lead"]);

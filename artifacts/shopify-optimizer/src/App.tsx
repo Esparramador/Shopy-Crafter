@@ -43,6 +43,7 @@ const SystemHealth = lazy(() => import("@/pages/admin/SystemHealth"));
 const ShopyBrain = lazy(() => import("@/pages/admin/ShopyBrain"));
 const ShopyBrainMemories = lazy(() => import("@/pages/admin/ShopyBrainMemories"));
 const ShopyBrainInsights = lazy(() => import("@/pages/admin/ShopyBrainInsights"));
+const BrainPanel = lazy(() => import("@/pages/admin/BrainPanel"));
 const ShopyBrainStudy = lazy(() => import("@/pages/admin/ShopyBrainStudy"));
 const MyPricing = lazy(() => import("@/pages/admin/MyPricing"));
 const CommandCenter = lazy(() => import("@/pages/admin/CommandCenter"));
@@ -502,6 +503,9 @@ function Router() {
         </Route>
         <Route path="/admin/prompt-library">
           <RequireAdmin><AdminWrapper><AppLayout><S><PromptLibrary /></S></AppLayout></AdminWrapper></RequireAdmin>
+        </Route>
+        <Route path="/admin/cerebro">
+          <RequireAdmin><AdminWrapper><AppLayout><S><BrainPanel /></S></AppLayout></AdminWrapper></RequireAdmin>
         </Route>
         <Route path="/admin/shopybrain/memories">
           <RequireAdmin><AdminWrapper><AppLayout><S><ShopyBrainMemories /></S></AppLayout></AdminWrapper></RequireAdmin>

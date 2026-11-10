@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { enableLongRunning } from "../lib/long-running.js";
+import { trackStudioRun } from "../lib/brain/studio-report.js";
 import { db, projectsTable, productsTable } from "@workspace/db";
 import { projectFilesTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -114,6 +115,11 @@ router.get("/generator/types", (_req: Request, res: Response) => {
 
 router.post("/generator/run", async (req: Request, res: Response): Promise<any> => {
   enableLongRunning(res);
+  trackStudioRun(req, res, {
+    studio: "generador", operation: "run",
+    input: r => [r.body?.type, r.body?.url].filter(Boolean).join(" · "),
+    params: r => ({ type: r.body?.type, format: r.body?.format, level: r.body?.level, template: r.body?.template }),
+  });
   try {
     const { type, projectId, url, format, template, level, params: extraParams } = req.body;
     const reportLevel = Math.max(1, Math.min(5, parseInt(String(level)) || 1));
