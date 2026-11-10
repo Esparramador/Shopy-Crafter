@@ -1,18 +1,15 @@
 import { Router } from "express";
 import { renderHtmlOrText } from "../lib/html-escape.js";
-import { db, auditLogTable, contactPrereportJobsTable } from "@workspace/db";
+import { db } from "@workspace/db";
 import { projectFilesTable } from "@workspace/db/schema";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
-  claimContactSubmission,
   isValidContactIdempotencyKey,
   IDEMPOTENCY_KEY_REUSED,
   type ContactLeadData,
-  type ContactSubmissionRecord,
 } from "../lib/contact-idempotency.js";
-import { createContactRateLimiter } from "../lib/contact-rate-limit.js";
-import { PgRateLimitStore } from "../lib/pg-rate-limit-store.js";
+import { acceptContactLead } from "../lib/contact-lead.js";
 import { PostgresContactPrereportStore } from "../lib/contact-prereport-store.js";
 import { startContactPrereportWorker as startWorker } from "../lib/contact-prereport-worker.js";
 import multer from "multer";
@@ -45,8 +42,6 @@ function safeErrorCode(error: unknown): string {
 // 5 solicitudes nuevas por IP y hora, en Postgres (persiste y se comparte entre
 // instancias). Solo se consulta para solicitudes nuevas: los reintentos con la
 // misma Idempotency-Key no gastan cupo.
-const checkContactRateLimit = createContactRateLimiter(new PgRateLimitStore("contact"));
-
 type LeadData = ContactLeadData;
 
 interface MarketMetrics {
@@ -1523,34 +1518,10 @@ router.post("/contact", contactUpload.single("referenceImage"), async (req, res)
       submittedAt: new Date().toISOString(),
     };
 
-    const claim = await claimContactSubmission(
-      suppliedKey ?? randomUUID(),
-      leadData,
-      {
-        find: async id => {
-          const [existing] = await db.select({
-            action: auditLogTable.action,
-            details: auditLogTable.details,
-          }).from(auditLogTable).where(eq(auditLogTable.id, id)).limit(1);
-          return existing as ContactSubmissionRecord | undefined;
-        },
-        insert: async record => {
-          return db.transaction(async tx => {
-            const [inserted] = await tx.insert(auditLogTable).values({
-              id: record.id,
-              userId: "public",
-              action: record.action,
-              details: record.details,
-              ipAddress: req.ip ?? "unknown",
-            }).onConflictDoNothing().returning({ id: auditLogTable.id });
-            if (!inserted) return false;
-            await tx.insert(contactPrereportJobsTable).values({ submissionId: record.id });
-            return true;
-          });
-        },
-      },
-      () => checkContactRateLimit(req.ip ?? "unknown"),
-    );
+    const claim = await acceptContactLead(leadData, {
+      idempotencyKey: suppliedKey ?? randomUUID(),
+      ip: req.ip ?? "unknown",
+    });
 
     if (claim === "rate_limited") {
       res.status(429).json({ error: "Demasiadas solicitudes. Inténtalo de nuevo más tarde." });

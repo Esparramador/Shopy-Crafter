@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { buildActionCatalogText } from "../lib/brain/catalog.js";
 import { db, projectsTable, productsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { askClaudeJsonWithBrain, learnFromOperation } from "../lib/claude.js";
@@ -235,27 +236,7 @@ router.post("/voice/command", requireAdmin, async (req, res): Promise<void> => {
   2. Una acción a ejecutar (si aplica)
   
   Acciones disponibles:
-  - store_status: Ver estado de la tienda. Params: {projectId}
-  - list_products: Listar productos activos. Params: {projectId, limit?}
-  - list_all_products: Listar TODOS los productos (active, draft, archived). Params: {projectId, limit?, statusFilter? ("any","active","draft","archived")}
-  - create_product: Crear producto en Shopify. Params: {projectId, title, price?, productType?, aiGenerate?}
-  - edit_product: Editar producto. Params: {projectId, productId, title?, bodyHtml?, tags?, status?, price?}
-  - change_price: Cambiar precio. Params: {projectId, productId, price, compareAtPrice?}
-  - set_product_status: Cambiar estado de producto (publicar/despublicar/archivar). Params: {projectId, productId, status ("active","draft","archived")}
-  - scan_store: Escanear/auditar TODOS los productos de la tienda (incluye draft y archived). Params: {projectId, statusFilter? ("any","active","draft","archived")}
-  - regenerate_token: Regenerar token de Shopify. Params: {projectId}
-  - get_scopes: Ver permisos OAuth. Params: {projectId}
-  - search_product: Buscar producto. Params: {projectId, query}
-  - publish_product: Publicar producto. Params: {projectId, productId}
-  - delete_product: Eliminar producto. Params: {projectId, productId}
-  - get_orders: Ver pedidos. Params: {projectId, limit?}
-  - search_suppliers: Buscar proveedores de un producto. Params: {productName, productCategory?, materials?, targetMarket?, qualityTier?, budget?, country?}
-  - modify_audit_filter: Cambiar filtro de auditoría (qué productos incluir). Params: {projectId, statusFilter ("any","active","draft","archived"), autoScan? (boolean)}
-  - diagnose_app: Diagnosticar el funcionamiento de la app, detectar y reparar errores. Params: {projectId, checks? ("all","token","sync","products","connectivity")}
-  - inspect_code: Leer y analizar código fuente de la app. Params: {filePath, analyze? (boolean)}
-  - fix_code: Aplicar corrección a un archivo de código. Params: {filePath, oldCode, newCode, description}
-  - list_source_files: Listar archivos del código fuente. Params: {directory?, pattern?}
-  - analyze_component: Analizar componente buscando bugs. Params: {filePath, focusOn? ("bugs","ux","performance","logic","all")}
+${buildActionCatalogText("admin")}
   - navigate: Navegar a página. Params: {path}
   - navigate: Ir a /projects/{projectId}/audit para ver auditoría visual
   
