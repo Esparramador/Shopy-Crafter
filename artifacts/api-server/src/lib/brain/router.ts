@@ -64,6 +64,32 @@ export interface BrainRouteInput {
   models?: { claude?: unknown; gpt?: unknown; nvidia?: unknown };
   /** Para el coste por sesión de chat (api_usage). */
   chatSessionId?: string | null;
+  /**
+   * Solo client/public: instrucciones propias del canal (las escribe la ruta, nunca
+   * el usuario). Se AÑADEN al prompt de la puerta, que conserva sus reglas; el
+   * cerebro sigue poniendo el proyecto, la ficha del cliente y SOLO las acciones
+   * permitidas en esa puerta.
+   */
+  channelPrompt?: string;
+  /**
+   * Solo client/public: chat rápido con Gemini Flash (el de la landing y el del
+   * cliente) en vez del motor general. `messages` es la conversación entera, con
+   * el último mensaje del usuario (= `text`). Con `onText` responde en streaming:
+   * recibe el texto según llega, ya sin los bloques :::ACTION:::.
+   */
+  chat?: BrainChatOptions;
+  /** No contestar saludos sin LLM (canales con un guion propio). */
+  skipTrivial?: boolean;
+}
+
+export interface BrainChatTurn { role: "user" | "assistant"; content: string }
+
+export interface BrainChatOptions {
+  messages: BrainChatTurn[];
+  maxOutputTokens?: number;
+  /** Búsqueda en Google (solo en streaming, como el chat del cliente). */
+  useSearch?: boolean;
+  onText?: (chunk: string) => void;
 }
 
 export interface BrainRouteResult {
@@ -74,6 +100,8 @@ export interface BrainRouteResult {
   actions: BrainProposedAction[];
   /** Propuestas por el modelo y descartadas por permiso. */
   dropped: BrainProposedAction[];
+  /** Fuentes de la búsqueda (chat rápido con useSearch). */
+  sources?: string[];
   /** Motor efectivo (el antiguo `source` de /search): "auto→claude+omnicore", "gemini+search", "trivial"… */
   engine: string;
   engineMode: BrainEngineMode;
@@ -96,6 +124,51 @@ export function extractActions(answer: string): { actions: BrainProposedAction[]
     } catch { /* invalid JSON, skip */ }
   }
   return { actions, clean: answer.replace(/:::ACTION:::[\s\S]*?:::END_ACTION:::/g, "").trim() };
+}
+
+const ACTION_OPEN = ":::ACTION:::";
+const ACTION_CLOSE = ":::END_ACTION:::";
+
+/**
+ * Para el streaming: deja pasar el texto y se come los bloques :::ACTION:::,
+ * aunque lleguen partidos entre trozos (retiene el final que podría ser el
+ * principio de un bloque hasta saberlo). `end()` suelta lo retenido.
+ */
+export function createActionStreamFilter(emit: (text: string) => void): { push(text: string): void; end(): void } {
+  let buf = "";
+  let inBlock = false;
+  const flush = (final: boolean) => {
+    for (;;) {
+      if (inBlock) {
+        const close = buf.indexOf(ACTION_CLOSE);
+        if (close < 0) {
+          buf = final ? "" : buf.slice(Math.max(0, buf.length - (ACTION_CLOSE.length - 1)));
+          return;
+        }
+        buf = buf.slice(close + ACTION_CLOSE.length);
+        inBlock = false;
+        continue;
+      }
+      const open = buf.indexOf(ACTION_OPEN);
+      if (open >= 0) {
+        if (open > 0) emit(buf.slice(0, open));
+        buf = buf.slice(open + ACTION_OPEN.length);
+        inBlock = true;
+        continue;
+      }
+      let keep = 0;
+      if (!final) {
+        for (let k = Math.min(ACTION_OPEN.length - 1, buf.length); k > 0; k--) {
+          if (ACTION_OPEN.startsWith(buf.slice(-k))) { keep = k; break; }
+        }
+      }
+      const out = buf.slice(0, buf.length - keep);
+      if (out) emit(out);
+      buf = buf.slice(buf.length - keep);
+      return;
+    }
+  };
+  return { push: (text) => { buf += text; flush(false); }, end: () => flush(true) };
 }
 
 /**
@@ -326,6 +399,12 @@ ${buildActionCatalogText(gate)}
 ${ACTION_BLOCK_FORMAT}`;
 }
 
+/** Instrucciones del canal (client/public), detrás de las reglas de la puerta. */
+function channelBlock(input: BrainRouteInput): string {
+  const p = input.channelPrompt?.trim();
+  return p ? `\n\n== INSTRUCCIONES DE ESTE CANAL (${input.channel}) ==\n${p}\n== FIN DE INSTRUCCIONES DEL CANAL ==` : "";
+}
+
 /** Puerta client: solo SU proyecto. */
 async function buildClientContext(input: BrainRouteInput): Promise<BuiltContext> {
   const projectId = parseInt(String(input.projectId ?? ""), 10);
@@ -339,7 +418,7 @@ async function buildClientContext(input: BrainRouteInput): Promise<BuiltContext>
   if (!proj) throw new Error(`Proyecto ${projectId} no encontrado`);
   const platform = getPlatform(proj.platformType);
   const projectBlock = `\n\nPROYECTO DEL CLIENTE: ID=${proj.id}, nombre="${proj.name}", dominio="${proj.shopDomain}", plataforma=${platform.label}. Las acciones se ejecutan siempre sobre este proyecto.`;
-  const sysPrompt = CLIENT_PROMPT + projectBlock + (profile ? `\n\n${profile}` : "") + (brandDna || "") + gateActionBlock("client");
+  const sysPrompt = CLIENT_PROMPT + channelBlock(input) + projectBlock + (profile ? `\n\n${profile}` : "") + (brandDna || "") + gateActionBlock("client");
   return {
     sysPrompt,
     userContent: withHistory(input.text, input.history),
@@ -352,7 +431,7 @@ async function buildClientContext(input: BrainRouteInput): Promise<BuiltContext>
 /** Puerta public: lo publicado (módulos y precios). */
 function buildPublicContext(input: BrainRouteInput): BuiltContext {
   return {
-    sysPrompt: `${PUBLIC_PROMPT}\n\n${buildModulesBlock()}\n\n${buildPricingBlock()}${gateActionBlock("public")}`,
+    sysPrompt: `${PUBLIC_PROMPT}${channelBlock(input)}\n\n${buildModulesBlock()}\n\n${buildPricingBlock()}${gateActionBlock("public")}`,
     userContent: withHistory(input.text, input.history),
     potentialEntity: null,
     entityKnowledgeUsed: false,
@@ -693,6 +772,48 @@ Responde SIEMPRE en español. Sé directo, profesional y útil.`;
   return { answer, engineUsed, searchUsage };
 }
 
+/**
+ * Chat rápido (Gemini Flash) de las puertas client/public, con o sin streaming.
+ * Gemini registra él mismo su consumo en api_usage (no se vuelve a contar).
+ */
+async function runFastChat(p: {
+  chat: BrainChatOptions;
+  sysPrompt: string;
+  userContent: string;
+  resolvedProjectId?: string;
+}): Promise<{ answer: string; engineUsed: string; searchUsage?: BrainUsage; sources?: string[]; usageRecorded: boolean }> {
+  const { chat, sysPrompt } = p;
+  const projectNum = p.resolvedProjectId ? parseInt(p.resolvedProjectId) || 0 : 0;
+  const gemini = await import("../gemini.js");
+
+  if (chat.onText) {
+    const filter = createActionStreamFilter(chat.onText);
+    let answer = "";
+    let usage: BrainUsage | undefined;
+    let sources: string[] | undefined;
+    for await (const chunk of gemini.askGeminiStream(chat.messages, sysPrompt, { thinkingBudget: 0, useSearch: !!chat.useSearch })) {
+      if (chunk.error) throw new Error(`Streaming interrumpido: ${String(chunk.error).slice(0, 200)}`);
+      if (chunk.text) { answer += chunk.text; filter.push(chunk.text); }
+      if (chunk.usage) usage = { inputTokens: chunk.usage.inputTokens, outputTokens: chunk.usage.outputTokens, costUsd: chunk.usage.costUsd, model: chunk.usage.model };
+      if (chunk.sources?.length) sources = chunk.sources;
+      if (chunk.done) break;
+    }
+    filter.end();
+    return { answer, engineUsed: chat.useSearch ? "gemini-chat+search" : "gemini-chat", searchUsage: usage, sources, usageRecorded: true };
+  }
+
+  try {
+    const answer = await gemini.askGeminiChat(chat.messages, sysPrompt, { maxOutputTokens: chat.maxOutputTokens ?? 2048 });
+    if (answer.trim()) return { answer, engineUsed: "gemini-chat", usageRecorded: true };
+  } catch (err) {
+    // El tope de gasto no se salta con otro motor.
+    if (err instanceof Error && err.name === "AiBudgetExceededError") throw err;
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, "ShopyBrain: chat rápido sin Gemini — Claude");
+  }
+  const claude = await askClaudeWithUsage(projectNum, [{ role: "user", content: p.userContent }], sysPrompt, chat.maxOutputTokens ?? 8192, 120_000);
+  return { answer: claude.text, engineUsed: "gemini-chat→claude", searchUsage: claude.usage, usageRecorded: false };
+}
+
 function providerOf(engineUsed: string): "claude" | "gemini" | "grok" {
   const providerMap: Record<string, "claude" | "gemini" | "grok"> = {
     "gemini": "gemini",
@@ -728,8 +849,9 @@ export async function brainRoute(input: BrainRouteInput): Promise<BrainRouteResu
     input: input.text,
   };
 
-  const trivial = trivialReply(input.text, gate);
+  const trivial = input.skipTrivial ? null : trivialReply(input.text, gate);
   if (trivial) {
+    if (gate !== "admin") input.chat?.onText?.(trivial);
     const durationMs = Date.now() - started;
     void recordBrainEvent({ ...eventBase, kind: "answer", engine: "trivial", status: "ok", durationMs });
     return {
@@ -743,7 +865,10 @@ export async function brainRoute(input: BrainRouteInput): Promise<BrainRouteResu
       : gate === "client" ? await buildClientContext(input)
       : buildPublicContext(input);
 
-    const { answer, engineUsed, searchUsage } = await runEngine({
+    const fastChat = gate !== "admin" && input.chat?.messages?.length ? input.chat : null;
+    const { answer, engineUsed, searchUsage, sources, usageRecorded } = fastChat
+      ? await runFastChat({ chat: fastChat, sysPrompt: ctx.sysPrompt, userContent: ctx.userContent, resolvedProjectId: ctx.resolvedProjectId })
+      : { ...(await runEngine({
       engine: engineMode,
       query: input.text,
       niche: input.niche,
@@ -754,7 +879,7 @@ export async function brainRoute(input: BrainRouteInput): Promise<BrainRouteResu
       reqClaudeModel: gate === "admin" ? input.models?.claude : undefined,
       reqGptModel: gate === "admin" ? input.models?.gpt : undefined,
       reqNvidiaModel: gate === "admin" ? input.models?.nvidia : undefined,
-    });
+    })), sources: undefined as string[] | undefined, usageRecorded: false };
 
     const { actions: proposed, clean } = extractActions(answer);
     // Admin: todo pasa, como antes (lo desconocido lo rechaza /execute-action).
@@ -766,7 +891,7 @@ export async function brainRoute(input: BrainRouteInput): Promise<BrainRouteResu
 
     if (gate === "admin") learnFromConversation(input.text, clean, input.niche, actions[0]?.action);
 
-    if (searchUsage) {
+    if (searchUsage && !usageRecorded) {
       recordApiUsage({
         provider: providerOf(engineUsed),
         operation: "chat",
@@ -793,7 +918,7 @@ export async function brainRoute(input: BrainRouteInput): Promise<BrainRouteResu
     });
 
     return {
-      kind, text: clean, actions, dropped, engine: engineUsed, engineMode,
+      kind, text: clean, actions, dropped, ...(sources?.length ? { sources } : {}), engine: engineUsed, engineMode,
       model: searchUsage?.model ?? null, usage: searchUsage ?? null,
       entityKnowledgeUsed: ctx.entityKnowledgeUsed, potentialEntity: ctx.potentialEntity, durationMs,
     };

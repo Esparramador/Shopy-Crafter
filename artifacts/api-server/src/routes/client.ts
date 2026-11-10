@@ -10,11 +10,11 @@ import { checkMessageAttachments, msgUpload, msgUploadMulti, persistMsgUploads }
 import { buildCoverPage, type CoverTemplate } from "../lib/report-cover.js";
 import { logger } from "../lib/logger.js";
 import { businessYmd } from "../lib/tz.js";
-import { askClaude, learnFromOperation } from "../lib/claude.js";
-import { askGeminiChat } from "../lib/gemini.js";
+import { learnFromOperation } from "../lib/claude.js";
 import { buildClientPlatformContext } from "../lib/platform-knowledge.js";
+import { brainRoute, type BrainProposedAction } from "../lib/brain/router.js";
+import { brainExecute } from "../lib/brain/execute.js";
 import {
-  loadClientProfile,
   extractAndLearnFromChat,
   teachClientAdvisor,
   deleteClientKnowledge,
@@ -36,6 +36,60 @@ function getClientProjectId(req: import("express").Request): string {
   if (req.session.clientId) return String(req.session.clientId);
   if (req.session.role === "admin" && req.query.pid) return String(req.query.pid);
   return "";
+}
+
+// ── ShopyBrain (puerta client) ───────────────────────────────────────────────
+const CLIENT_CHANNEL = "client-chat";
+/** Acciones que se ejecutan por respuesta, como mucho. */
+const MAX_CLIENT_ACTIONS = 3;
+
+function historyText(turns: Array<{ role: string; content: string }>): string {
+  return turns.map(m => `${m.role === "assistant" ? "Asistente" : "Cliente"}: ${m.content}`).join("\n");
+}
+
+export interface ClientBrainActions {
+  /** Textos para añadir a la respuesta (resultado o error de cada acción). */
+  notes: string[];
+  results: Array<{ action: string; ok: boolean; message: string }>;
+  teamRequest: { ok: boolean; messageId?: string } | null;
+}
+
+/**
+ * Ejecuta lo que el cerebro propuso para este cliente. brainExecute (puerta client)
+ * vuelve a comprobar la lista blanca y fija el projectId de la sesión: el que
+ * venga en los parámetros del modelo se ignora.
+ */
+export async function runClientBrainActions(
+  actions: BrainProposedAction[],
+  opts: { projectId: number; userId?: string | null; userName?: string | null; skipTeam?: boolean },
+): Promise<ClientBrainActions> {
+  const out: ClientBrainActions = { notes: [], results: [], teamRequest: null };
+  for (const a of actions.slice(0, MAX_CLIENT_ACTIONS)) {
+    const action = String(a.action);
+    if (action === "request_team" && (opts.skipTeam || out.teamRequest)) continue;
+    const r = await brainExecute({
+      action,
+      params: a.params,
+      gate: "client",
+      channel: CLIENT_CHANNEL,
+      projectId: opts.projectId,
+      userId: opts.userId ?? null,
+      userName: opts.userName ?? null,
+    });
+    const body = r.kind === "result" ? r.body : {};
+    const ok = r.kind === "result" && r.status < 400 && !body.error && body.success !== false;
+    const message = typeof body.message === "string" && body.message.trim()
+      ? body.message.trim()
+      : typeof body.error === "string" ? body.error : ok ? "Hecho." : "No se pudo completar.";
+    out.results.push({ action, ok, message });
+    if (action === "request_team") {
+      out.teamRequest = { ok, ...(typeof body.messageId === "string" ? { messageId: body.messageId } : {}) };
+      out.notes.push(ok ? "✅ El equipo de Shopy Crafter ha recibido tu petición. Te responderán en Mensajes." : `⚠️ ${message}`);
+    } else {
+      out.notes.push(ok ? message : `⚠️ ${message}`);
+    }
+  }
+  return out;
 }
 
 /** Media redondeada de las puntuaciones presentes (null si no hay ninguna). */
@@ -810,48 +864,15 @@ router.post("/ai-chat", async (req, res): Promise<void> => {
       }
     }
 
-    // ── Load accumulated client profile ─────────────────────────────
-    const [filesContext, clientProfile] = await Promise.all([
-      Promise.resolve(hasFiles
-        ? `\n\nARCHIVOS QUE HA ENVIADO EL CLIENTE:\n${attachedFiles.map(f => `· ${f.fileName} (${f.fileType}, ${Math.round(f.fileSize / 1024)}KB)`).join("\n")}`
-        : ""),
-      loadClientProfile(pid),
-    ]);
+    const filesContext = hasFiles
+      ? `\n\nARCHIVOS QUE HA ENVIADO EL CLIENTE:\n${attachedFiles.map(f => `· ${f.fileName} (${f.fileType}, ${Math.round(f.fileSize / 1024)}KB)`).join("\n")}`
+      : "";
 
-    // ── Project Mode: fetch Brand DNA ────────────────────────────────
-    let brandDnaContext = "";
-    if (projectMode && !isNaN(pid)) {
-      try {
-        const bdRows = await db.execute(
-          sql`SELECT tone_of_voice, target_audience, brand_personality, sector, company_description,
-                     unique_value_proposition, taglines, brand_archetype, primary_colors, content_pillars
-              FROM brand_dna WHERE project_id = ${pid} ORDER BY extracted_at DESC LIMIT 1`
-        );
-        const bd: any = (bdRows as any).rows?.[0] ?? (Array.isArray(bdRows) ? bdRows[0] : null);
-        if (bd) {
-          brandDnaContext = `
-══ ADN DE MARCA DEL CLIENTE (usar para personalizar TODO) ══
-Sector: ${bd.sector ?? "No especificado"}
-Descripción: ${bd.company_description ?? ""}
-Arqueotipo: ${bd.brand_archetype ?? ""}
-Tono de voz: ${bd.tone_of_voice ?? ""}
-Audiencia: ${bd.target_audience ?? ""}
-Propuesta de valor: ${bd.unique_value_proposition ?? ""}
-Personalidad: ${bd.brand_personality ?? ""}
-Colores primarios: ${(bd.primary_colors ?? []).join(", ")}
-Taglines: ${(bd.taglines ?? []).join(" · ")}
-Pilares de contenido: ${(bd.content_pillars ?? []).join(", ")}
-════════════════════════════════════════════════════════════`;
-        }
-      } catch { /* silencioso */ }
-    }
+    // ── Prompt del canal ─────────────────────────────────────────────
+    // La ficha del cliente (client_knowledge) y su ADN de marca los añade ShopyBrain
+    // (puerta client), siempre del proyecto de la sesión.
+    const systemPrompt = projectMode ? `Actúas como el ARQUITECTO DE PROYECTOS IA de Shopy Crafter. Tu misión es ayudar al cliente a crear un brief completo y ejecutable — listo para pasarlo a cualquier IA (Claude, Gemini, ChatGPT, etc.) o agencia creativa. Hablas siempre en español.
 
-    // ── Build system prompt ──────────────────────────────────────────
-    const systemPrompt = projectMode ? `Eres el ARQUITECTO DE PROYECTOS IA de Shopy Crafter. Tu misión es ayudar al cliente a crear un brief completo y ejecutable — listo para pasarlo a cualquier IA (Claude, Gemini, ChatGPT, etc.) o agencia creativa. Hablas siempre en español.
-
-${brandDnaContext}
-
-${clientProfile ? clientProfile + "\n" : ""}
 TU MÉTODO ESTRUCTURADO (sigue este orden a lo largo de la conversación):
 1. DESCUBRIMIENTO — Pregunta qué quiere crear (app, web, brand book, e-commerce, APK, contenido, etc.) y para qué.
 2. AUDIENCIA & OBJETIVO — Profundiza en el público objetivo, el problema que resuelve y el objetivo de negocio.
@@ -890,7 +911,7 @@ CAPACIDADES:
 • Incorporar información nueva del cliente: datos de empresa, sector, competidores, objetivos, archivos
 • Sugerir estrategias de monetización y productos específicos para su nicho
 • Comparar con empresas similares del mismo sector y detectar brechas competitivas
-• Reenviar archivos/mensajes al equipo de Shopy Crafter (Joan)
+• Pasar sus peticiones al equipo de Shopy Crafter (Joan) con request_team
 
 ${buildClientPlatformContext()}
 
@@ -901,8 +922,7 @@ REGLAS:
 • Si detectas que el cliente NO usa una capacidad clave para su sector → señálalo proactivamente.
 • Sé directo, cálido, estratégico. Varía el inicio de cada respuesta.
 
-══ DATOS DE ESTE CLIENTE ══
-${clientProfile ? clientProfile + "\n" : ""}══ DATOS REALES DE LA TIENDA ══
+══ DATOS REALES DE LA TIENDA ══
 Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score medio: ${avgScore}/100 (${avgGrade})` : ""}
 Catálogo: ${products.length} productos — ${scored.length} auditados, ${unaudi} sin auditar
 ${lowScoreProducts.length > 0 ? `🔴 URGENTE: ${lowScoreProducts.length} producto(s) con score <50` : ""}
@@ -924,13 +944,28 @@ ${filesContext}
       { role: "user", content: msg || `[Cliente adjuntó ${attachedFiles.length} archivo(s)]` },
     ];
 
-    let reply: string;
-    try {
-      reply = await askGeminiChat(chatMessages, systemPrompt, { maxOutputTokens: 8192 });
-      if (!reply) throw new Error("empty");
-    } catch {
-      reply = await askClaude(isNaN(pid) ? 0 : pid, chatMessages, systemPrompt, 8192, 32000);
-    }
+    // ── ShopyBrain, puerta client: solo este proyecto y sus acciones ────
+    const brain = await brainRoute({
+      gate: "client",
+      channel: CLIENT_CHANNEL,
+      projectId: pid,
+      userId: req.session.userId ?? null,
+      text: chatMessages[chatMessages.length - 1]!.content,
+      history: historyText(chatMessages.slice(0, -1)),
+      channelPrompt: systemPrompt,
+      chat: { messages: chatMessages, maxOutputTokens: 8192 },
+      skipTrivial: projectMode,
+    });
+    const acted = await runClientBrainActions(brain.actions, {
+      projectId: pid,
+      userId: req.session.userId ?? null,
+      userName: req.session.name ?? null,
+      // Si ya se reenvió el mensaje entero, request_team lo duplicaría.
+      skipTeam: forwarded,
+    });
+    let reply = brain.text;
+    for (const note of acted.notes) reply += reply.trim() ? `\n\n${note}` : note;
+    if (acted.teamRequest?.ok) { forwarded = true; forwardedId ??= acted.teamRequest.messageId; }
 
     // ── Learn from this conversation (fire-and-forget) ───────────────
     if (msg) {
@@ -983,6 +1018,8 @@ ${filesContext}
       vaultFiles,
       forwarded,
       forwardedId,
+      ...(acted.teamRequest ? { teamRequest: acted.teamRequest } : {}),
+      ...(acted.results.length ? { actions: acted.results } : {}),
       autoSaved,
       projectMode,
       longReport: isLongReport,
@@ -1119,12 +1156,11 @@ router.post("/ai-chat/stream", async (req, res): Promise<void> => {
     const msg = (message ?? "").trim();
     if (!msg) { res.status(400).json({ error: "Message required" }); return; }
 
-    const [products, recentActivity, clientProfileStream] = await Promise.all([
+    const [products, recentActivity] = await Promise.all([
       db.select({ id: productsTable.id, title: productsTable.title, price: productsTable.price, auditScore: productsTable.auditScore, auditGrade: productsTable.auditGrade })
         .from(productsTable).where(eq(productsTable.projectId, pid)).limit(20),
       db.select({ action: auditLogTable.action, details: auditLogTable.details })
         .from(auditLogTable).where(eq(auditLogTable.projectId, projectId)).orderBy(desc(auditLogTable.createdAt)).limit(6),
-      loadClientProfile(pid),
     ]);
 
     const scored = products.filter(p => p.auditScore !== null);
@@ -1134,7 +1170,8 @@ router.post("/ai-chat/stream", async (req, res): Promise<void> => {
 
     // Primero lo fijo (igual para todos los clientes) y al final lo de este cliente:
     // así Gemini reutiliza en caché el inicio del prompt y cobra menos por esos tokens.
-    const systemPrompt = `Eres el asesor personal de negocio IA del cliente en Shopy Crafter. Conoces su empresa en profundidad y actúas como socio estratégico de confianza. Hablas siempre en español. Tienes acceso a Google Search cuando el cliente lo necesite.
+    // La ficha del cliente y su ADN de marca los añade ShopyBrain (puerta client).
+    const systemPrompt = `Actúas como el asesor personal de negocio IA del cliente en Shopy Crafter. Conoces su empresa en profundidad y actúas como socio estratégico de confianza. Hablas siempre en español. Tienes acceso a Google Search cuando el cliente lo necesite. Si pide algo que solo puede hacer el equipo, pásaselo con request_team.
 
 MISIÓN PRINCIPAL:
 • Ser el asesor más informado sobre el negocio del cliente: sector, competidores, objetivos, retos y oportunidades
@@ -1146,8 +1183,7 @@ ${buildClientPlatformContext()}
 
 REGLAS: Por defecto, unas 220 palabras; si el cliente pide detalle, un informe, un plan o un texto largo, extiéndete todo lo necesario. Termina con UNA acción concreta. Si el cliente comparte datos de su empresa → acúsalo recibo y úsalos. Varía el inicio.
 
-══ DATOS DE ESTE CLIENTE ══
-${clientProfileStream ? clientProfileStream + "\n" : ""}DATOS DE LA TIENDA:
+DATOS DE LA TIENDA:
 Salud: ${storeHealth.toUpperCase()}${avgScore !== null ? ` · Score: ${avgScore}/100` : ""}
 Catálogo: ${products.length} productos — ${scored.length} auditados
 
@@ -1173,17 +1209,40 @@ ${useSearch ? `MODO DEEP RESEARCH ACTIVADO: Usa Google Search para datos reales 
       { role: "user" as const, content: msg },
     ];
 
-    const { askGeminiStream } = await import("../lib/gemini.js");
-    const gen = askGeminiStream(chatMessages, systemPrompt, { useSearch, thinkingBudget: 0 });
-
-    let fullResponse = "";
-    for await (const chunk of gen) {
-      if (res.destroyed) break;
-      if (chunk.text) fullResponse += chunk.text;
-      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+    const send = (payload: Record<string, unknown>) => {
+      if (res.destroyed) return;
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
       (res as any).flush?.();
-      if (chunk.done) break;
+    };
+
+    // ── ShopyBrain, puerta client: el texto llega en streaming sin los bloques de acción ──
+    const brain = await brainRoute({
+      gate: "client",
+      channel: CLIENT_CHANNEL,
+      projectId: pid,
+      userId: req.session.userId ?? null,
+      text: msg,
+      history: historyText(chatMessages.slice(0, -1)),
+      channelPrompt: systemPrompt,
+      chat: { messages: chatMessages, useSearch, onText: (text) => { if (text) send({ text }); } },
+    });
+    const acted = await runClientBrainActions(brain.actions, {
+      projectId: pid,
+      userId: req.session.userId ?? null,
+      userName: req.session.name ?? null,
+    });
+    let fullResponse = brain.text;
+    for (const note of acted.notes) {
+      const chunk = fullResponse.trim() ? `\n\n${note}` : note;
+      fullResponse += chunk;
+      send({ text: chunk });
     }
+    send({
+      done: true,
+      ...(brain.sources?.length ? { sources: brain.sources } : {}),
+      ...(acted.teamRequest ? { teamRequest: acted.teamRequest } : {}),
+      ...(acted.results.length ? { actions: acted.results } : {}),
+    });
     if (!res.destroyed) res.end();
 
     if (fullResponse.length > 80) {
