@@ -119,6 +119,11 @@ export function fromPrice(p: Product): { cents: number; perUnit: boolean } {
   return { cents: Number.isFinite(best) ? best : 0, perUnit };
 }
 
+/** Precio de entrada de una variante, según su tramo inicial. */
+export function variantFromPrice(v: Variant): number {
+  return Math.min(...v.tiers.map(t => t.unitCents));
+}
+
 // ── Carrito ──────────────────────────────────────────────────────────────────
 
 export interface CartItem {

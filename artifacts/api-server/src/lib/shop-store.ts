@@ -89,9 +89,9 @@ export function ensureShopTables(): Promise<void> {
 
 async function seedCatalog(): Promise<void> {
   const v = await db.execute(sql`SELECT value FROM app_settings WHERE key = 'shop_catalog_version'`);
-  if ((v.rows[0] as { value?: string } | undefined)?.value === SHOP_SEED_VERSION) return;
-  for (const p of SHOP_SEED) {
-    await db.execute(sql`
+  if ((v.rows[0] as { value?: string } | undefined)?.value !== SHOP_SEED_VERSION) {
+    for (const p of SHOP_SEED) {
+      await db.execute(sql`
       INSERT INTO shop_products (slug, kind, category, name, tagline, description, features, media, variants, addons, fields,
                                  qty_options, min_qty, max_qty, lead_days, demo_url, featured, visible, sort_order)
       VALUES (${p.slug}, ${p.kind}, ${p.category}, ${p.name}, ${p.tagline}, ${p.description},
@@ -99,10 +99,10 @@ async function seedCatalog(): Promise<void> {
               ${JSON.stringify(p.addons)}::jsonb, ${JSON.stringify(p.fields)}::jsonb, ${JSON.stringify(p.qtyOptions)}::jsonb,
               ${p.minQty}, ${p.maxQty}, ${p.leadDays}, ${p.demoUrl}, ${p.featured}, ${p.visible}, ${p.sortOrder})
       ON CONFLICT (slug) DO NOTHING
-    `);
-    // Un producto que nadie ha tocado desde el panel (updated_at = created_at) sigue al catálogo:
-    // así llegan los cambios de precio o texto de una versión nueva sin pisar lo editado a mano.
-    await db.execute(sql`
+      `);
+      // Un producto que nadie ha tocado desde el panel (updated_at = created_at) sigue al catálogo:
+      // así llegan los cambios de precio o texto de una versión nueva sin pisar lo editado a mano.
+      await db.execute(sql`
       UPDATE shop_products SET
         kind = ${p.kind}, category = ${p.category}, name = ${p.name}, tagline = ${p.tagline}, description = ${p.description},
         features = ${JSON.stringify(p.features)}::jsonb, media = ${JSON.stringify(p.media)}::jsonb,
@@ -111,13 +111,48 @@ async function seedCatalog(): Promise<void> {
         min_qty = ${p.minQty}, max_qty = ${p.maxQty}, lead_days = ${p.leadDays}, demo_url = ${p.demoUrl},
         featured = ${p.featured}, visible = ${p.visible}, sort_order = ${p.sortOrder}
       WHERE slug = ${p.slug} AND updated_at = created_at
+      `);
+    }
+    await db.execute(sql`
+      INSERT INTO app_settings (key, value) VALUES ('shop_catalog_version', ${SHOP_SEED_VERSION})
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
     `);
+    logger.info({ version: SHOP_SEED_VERSION }, "tienda: catálogo inicial aplicado");
   }
+
+  // Corrige exclusivamente la tarifa antigua de 100 unidades en la variante doble cara.
+  // También se ejecuta cuando la versión del catálogo ya coincide: es idempotente y no
+  // pisa cambios de nombre, textos, otras variantes ni tarifas distintas de la anterior.
   await db.execute(sql`
-    INSERT INTO app_settings (key, value) VALUES ('shop_catalog_version', ${SHOP_SEED_VERSION})
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+    UPDATE shop_products
+    SET variants = (
+      SELECT jsonb_agg(
+        CASE WHEN variant.value->>'key' = 'doble-cara' THEN
+          jsonb_set(variant.value, '{tiers}', (
+            SELECT jsonb_agg(
+              CASE
+                WHEN tier.value->>'min' = '100' AND tier.value->>'unitCents' = '45'
+                  THEN jsonb_set(tier.value, '{unitCents}', '55'::jsonb)
+                ELSE tier.value
+              END ORDER BY tier.ordinality
+            )
+            FROM jsonb_array_elements(variant.value->'tiers') WITH ORDINALITY AS tier(value, ordinality)
+          ))
+        ELSE variant.value END ORDER BY variant.ordinality
+      )
+      FROM jsonb_array_elements(shop_products.variants) WITH ORDINALITY AS variant(value, ordinality)
+    ),
+    updated_at = NOW()
+    WHERE slug = 'tarjetas-metalicas'
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(shop_products.variants) AS variant(value)
+        CROSS JOIN LATERAL jsonb_array_elements(variant.value->'tiers') AS tier(value)
+        WHERE variant.value->>'key' = 'doble-cara'
+          AND tier.value->>'min' = '100'
+          AND tier.value->>'unitCents' = '45'
+      )
   `);
-  logger.info({ version: SHOP_SEED_VERSION }, "tienda: catálogo inicial aplicado");
 }
 
 const arr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);

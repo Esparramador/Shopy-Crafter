@@ -6,7 +6,7 @@ import { Flip } from "gsap/Flip";
 import { Bot, Megaphone, MessageCircle, Smartphone } from "lucide-react";
 import PageMeta, { metaFor } from "@/components/PageMeta";
 import ShopLayout from "./ShopLayout";
-import { assetUrl, coverOf, euros, fromPrice, loadCatalog, priceLabel, serviceMark, type Catalog, type Product } from "./shop-api";
+import { assetUrl, coverOf, euros, fromPrice, loadCatalog, priceLabel, serviceMark, variantFromPrice, type Catalog, type Product } from "./shop-api";
 import { AI_SERVICES_CATEGORY, SHOP_SERVICE_OFFERS, shopServiceContactHref, type ShopServiceOffer } from "./shop-services";
 import { bindMagnetic, bindTilt, prefersReduced } from "./shop-motion";
 
@@ -20,7 +20,7 @@ function Words({ text }: { text: string }) {
   return <>{words.map((w, i) => <Fragment key={i}><span className="shop-w"><span>{w}</span></span>{i < words.length - 1 ? " " : null}</Fragment>)}</>;
 }
 
-const MARQUEE = ["Stands con QR para reseñas, wifi o carta", "Tarjetas con foto y mensaje", "Grabado láser en Barcelona", "Tarjetas de aluminio a 0,45 €", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Webs, Google y reseñas · precios a partir de"];
+const MARQUEE = ["Stands con QR para reseñas, wifi o carta", "Tarjetas con foto y mensaje", "Grabado láser en Barcelona", "Prueba de diseño antes de producir", "Envío gratis desde 60 €", "Pago seguro con Stripe", "Webs, Google y reseñas · precios a partir de"];
 
 function ProductCard({ p }: { p: Product }) {
   const cover = coverOf(p);
@@ -128,7 +128,11 @@ export default function Shop() {
   const kit = data?.products.find(p => p.slug === "kit-resenas");
   const kitPrice = kit?.variants[0]?.tiers[0]?.unitCents;
   const cards = data?.products.find(p => p.slug === "tarjetas-metalicas");
-  const cardFrom = cards ? fromPrice(cards).cents : 35;
+  const cardFrom = cards ? fromPrice(cards).cents : null;
+  const oneFace = cards?.variants.find(v => v.key === "una-cara");
+  const doubleFace = cards?.variants.find(v => v.key === "doble-cara");
+  const oneFaceCents = oneFace ? variantFromPrice(oneFace) : null;
+  const doubleFaceCents = doubleFace ? variantFromPrice(doubleFace) : null;
 
   // Portada: titular palabra a palabra, CTA y giro 3D con el scroll.
   useEffect(() => {
@@ -178,7 +182,7 @@ export default function Shop() {
         start: "top 92%", once: true,
         onEnter: els => gsap.fromTo(els, { y: 60, opacity: 0, rotateX: -14, scale: 0.94 }, { y: 0, opacity: 1, rotateX: 0, scale: 1, duration: 0.85, stagger: 0.08, ease: "power3.out", overwrite: "auto" }),
       });
-      // Bloque de tarjetas: imagen con parallax y precio que cuenta hasta 0,45 €.
+      // Bloque de tarjetas: imagen con parallax y precio que cuenta hasta el precio de catálogo.
       gsap.fromTo(".shop-offer-media img", { yPercent: -12, scale: 1.15 }, { yPercent: 12, scale: 1.05, ease: "none", scrollTrigger: { trigger: ".shop-offer", start: "top bottom", end: "bottom top", scrub: true } });
       gsap.fromTo(promoPrice.current, { scale: 0.4, opacity: 0, rotate: -8 }, { scale: 1, opacity: 1, rotate: 0, duration: 1.1, ease: "elastic.out(1, 0.45)", scrollTrigger: { trigger: ".shop-offer", start: "top 75%", once: true } });
       gsap.from(".shop-offer-list li", { x: -30, opacity: 0, stagger: 0.08, duration: 0.6, ease: "power3.out", scrollTrigger: { trigger: ".shop-offer", start: "top 70%", once: true } });
@@ -242,11 +246,11 @@ export default function Shop() {
               <h1><Words text="Lo que hacemos," /> <em><Words text="listo para pedir." /></em></h1>
               <p>Stands de madera con QR, tarjetas de aluminio con tu mensaje, expositores y fotos grabadas con nuestra xTool F2. También hacemos webs, rediseño de tiendas, ficha de Google Maps y reseñas, auditorías SEO, optimización PageSpeed, informes mensuales y vídeo animado en 3D.</p>
               <div className="shop-hero-ctas">
-                <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas desde {euros(cardFrom)} →</Link>
+                <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas{cardFrom !== null ? ` desde ${euros(cardFrom)}` : ""} →</Link>
                 <a href="#catalogo" className="shop-btn shop-btn-ghost shop-btn-lg">Ver todo el catálogo</a>
               </div>
               <ul className="shop-hero-facts">
-                <li><strong>{euros(cardFrom)}</strong><span>por tarjeta de aluminio</span></li>
+                {cardFrom !== null && <li><strong>{euros(cardFrom)}</strong><span>por tarjeta de aluminio</span></li>}
                 <li><strong>3–7 días</strong><span>envío a España</span></li>
                 <li><strong>Stripe</strong><span>pago seguro</span></li>
               </ul>
@@ -261,7 +265,7 @@ export default function Shop() {
 
         <div className="shop-marquee" aria-hidden="true">
           <div className="shop-marquee-track">
-            {[...MARQUEE, ...MARQUEE].map((t, i) => <span key={i}>{t}<i>✦</i></span>)}
+            {[...MARQUEE, ...(cardFrom !== null ? [`Tarjetas de aluminio desde ${euros(cardFrom)}`] : []), ...MARQUEE, ...(cardFrom !== null ? [`Tarjetas de aluminio desde ${euros(cardFrom)}`] : [])].map((t, i) => <span key={i}>{t}<i>✦</i></span>)}
           </div>
         </div>
 
@@ -271,10 +275,10 @@ export default function Shop() {
           </div>
           <div className="shop-offer-copy">
             <span className="shop-eyebrow">Tarjetas de visita de aluminio</span>
-            <h2 id="oferta-h">Desde <strong ref={promoPrice} className="shop-offer-price">{euros(cardFrom)}</strong> la tarjeta.</h2>
+            <h2 id="oferta-h">Desde <strong ref={promoPrice} className="shop-offer-price">{cardFrom !== null ? euros(cardFrom) : "…"}</strong> la tarjeta.</h2>
             <ul className="shop-offer-list">
-              <li><b>Una cara · 0,45 €</b> logo, datos y QR en el mismo lado</li>
-              <li><b>Doble cara · 0,45 €</b> tu diseño delante, datos y QR detrás</li>
+              <li><b>Una cara{oneFaceCents !== null ? ` · ${euros(oneFaceCents)}` : ""}</b> logo, datos y QR en el mismo lado</li>
+              <li><b>Doble cara{doubleFaceCents !== null ? ` · ${euros(doubleFaceCents)}` : ""}</b> tu diseño delante, datos y QR detrás</li>
               <li><b>Desde 100 tarjetas</b> con diseño básico y prueba incluidos</li>
             </ul>
             <div className="shop-hero-ctas">

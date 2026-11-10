@@ -22,6 +22,7 @@ export default function ShopCart() {
   const [paying, setPaying] = useState(false);
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [more, setMore] = useState<Product[]>([]);
+  const [cardFromCents, setCardFromCents] = useState<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const cancelled = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("cancelado");
 
@@ -38,7 +39,11 @@ export default function ShopCart() {
 
   useEffect(() => { loadSettings().then(setSettings).catch(() => {}); }, []);
   useEffect(() => {
-    loadCatalog().then(c => setMore(suggestions(c.products, items.map(i => i.slug), items.length ? 3 : 6))).catch(() => {});
+    loadCatalog().then(c => {
+      setMore(suggestions(c.products, items.map(i => i.slug), items.length ? 3 : 6));
+      const cards = c.products.find(p => p.slug === "tarjetas-metalicas");
+      if (cards) setCardFromCents(fromPrice(cards).cents);
+    }).catch(() => {});
   }, [items]);
 
   // Entrada escalonada de líneas, resumen y sugerencias.
@@ -93,7 +98,7 @@ export default function ShopCart() {
           <div className="shop-empty">
             <p>Todavía no has añadido nada. Empieza por lo más pedido:</p>
             <div className="shop-hero-ctas" style={{ justifyContent: "center" }}>
-              <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas desde 0,45 € →</Link>
+              <Link href="/tienda/tarjetas-metalicas" className="shop-btn shop-btn-gold shop-btn-lg shop-btn-shine">Tarjetas{cardFromCents !== null ? ` desde ${euros(cardFromCents)}` : ""} →</Link>
               <Link href="/tienda" className="shop-btn shop-btn-ghost shop-btn-lg">Ver la tienda</Link>
             </div>
           </div>
