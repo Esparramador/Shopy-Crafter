@@ -61,3 +61,44 @@ Consultas autenticadas de lectura al endpoint de modelo; no se crearon prediccio
 - Ajustes originales capturados: `stability=0.5`, `similarityBoost=0.8`, `speed=1.2`.
 - Restauración: guardar HTTP 200 y aplicar HTTP 200; admin, cliente y landing quedaron en estado `applied`. La comprobación final devolvió HTTP 200, `healthy=true`, `degraded=false`; los tres agentes estaban `ok`, y una lectura posterior confirmó los ajustes originales.
 - El estado de la alerta permaneció intacto. El usuario efímero de la comprobación cliente fue eliminado. No se cambió código ni se publicó; este informe es el único archivo añadido.
+
+## Seguimiento — sincronización, limpieza y repetición E2E
+
+### Master de GitHub
+
+- Se trajo `origin/master` con los PR #54 y #55. El commit remoto al sincronizar fue `2278f7a0d54d1ffa0fd0e5c13545d4133f4150d2`, merge del PR #55; también incluye el PR #54.
+- Se integró sin conflictos en el historial local, conservando los commits de Replit. HEAD quedó en `21c68ad94c4861f17c2fc6d886d6491f4df79435` (`Merge remote-tracking branch 'origin/master'`). `origin/master` es antecesor de HEAD; la rama local conserva sus commits no enviados.
+- `pnpm install --frozen-lockfile` terminó correctamente. Se reiniciaron API y web; `/api/healthz` respondió HTTP 200 (`{"status":"ok"}`).
+- No se hizo push ni se publicó. Los cambios de código y dependencias proceden del merge solicitado; no se hicieron ediciones manuales de código.
+
+### Eliminación controlada de agentes
+
+- La nueva vista previa `GET /api/voice/convai/orphans` respondió HTTP 200. Los cuatro IDs autorizados seguían en estado `orphan`; por ello se llamó a `POST /api/voice/convai/orphans/delete` con `confirm: true` y exactamente esos cuatro IDs.
+- El borrado respondió HTTP 200 y `success: true`; cada uno de los cuatro resultados fue `deleted`:
+  - `agent_6001m38en1dqemgsnczrx8qe03rb`
+  - `agent_1901m32hjs51ey5an4by92sqs2p3`
+  - `agent_1901kwyfkr7gf5jv4cet7tdm2s2s`
+  - `agent_4701kwwmzd6ef9wawmqrp0xctt82`
+- `agent_7901kwwcsehtfzm9wytya0mmy75z` no fue enviado a la ruta de borrado y continúa listado como huérfano. La vista previa posterior confirmó que los cuatro IDs borrados ya no aparecen.
+- Los agentes activos de admin (`agent_2701kwy2xhn9f9498qdhmqphhse9`), cliente (`agent_0501m32jt5tbfqwa8w4p8c54kfgk`) y landing (`agent_0201kwyfs8a8eqe9v0tx7v67r7da`) no se borraron; su salud posterior quedó `ok`.
+
+### E2E repetidos tras el PR #55
+
+#### `convai-voice-tuning`
+
+- **60 comprobaciones pasaron; 0 fallaron.**
+- Se completaron la previsualización de audio, guardado/aplicación, reaplicación de ajustes, verificación de concurrencia de llamada y sincronización del agente cliente tras guardar. No hubo errores de página.
+- El paso de reinicio interno del E2E se omitió porque no se definió `E2E_RESTART_CMD`; el workflow de API sí se había reiniciado previamente como parte de la sincronización solicitada.
+- El usuario de prueba se eliminó. El script restauró y aplicó los valores originales: `stability=0.5`, `similarityBoost=0.8`, `speed=1.2`.
+
+#### `convai-voice-call` en móvil
+
+- Modo cliente, `E2E_MOBILE=1`, viewport 375×812: **27 comprobaciones pasaron; 0 fallaron**.
+- El WebSocket real de ElevenLabs se abrió; el navegador envió 116 bloques de audio, recibió 9 bloques, transcribió la frase de prueba y Arturo respondió. El observador registró el orden correcto: preparación → conexión → llamada → respuesta.
+- La tarjeta, el transcript y «Colgar» quedaron dentro del viewport. El agente cliente permaneció en estado `ok` y el usuario efímero se eliminó correctamente.
+
+### Verificación final
+
+- `GET /api/voice/convai/voice-settings`: HTTP 200; `stability=0.5`, `similarityBoost=0.8`, `speed=1.2`.
+- `GET /api/voice/convai/health`: HTTP 200; `healthy=true`, `degraded=false`; admin, cliente y landing en `ok`.
+- `GET /api/voice/convai/orphans`: HTTP 200; los cuatro IDs borrados ausentes y el agente ShopyBrain preservado.
