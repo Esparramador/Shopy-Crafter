@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ContactLeadData } from "./contact-idempotency.js";
 import {
+  createContactPrereportEngineAttribution,
+  type GeneratedContactPrereport,
+} from "./contact-prereport-attribution.js";
+import {
   processNextContactPrereportJob,
   type ClaimedContactPrereportJob,
   type ContactDeliveryChannel,
@@ -25,6 +29,19 @@ const lead: ContactLeadData = {
   submittedAt: "2026-11-05T00:00:00.000Z",
 };
 
+const testAttribution = createContactPrereportEngineAttribution({
+  researchBySection: {
+    business: "claude-anthropic",
+    market: "gemini-fallback",
+    seo: "claude-anthropic",
+    suppliers: "gemini-fallback",
+  },
+});
+const testReport: GeneratedContactPrereport = {
+  html: "<html>one report</html>",
+  engineAttribution: testAttribution,
+};
+
 type DeliveryStatus = "pending" | "attempting" | ContactDeliveryOutcome;
 
 class FakeContactPrereportStore implements ContactPrereportStore {
@@ -34,7 +51,7 @@ class FakeContactPrereportStore implements ContactPrereportStore {
   klaviyoStatus: DeliveryStatus = "pending";
   reportAttempts = 0;
   reportFileId: number | null = null;
-  reportFiles = new Map<number, string>();
+  reportFiles = new Map<number, GeneratedContactPrereport>();
   leaseToken = "";
   claimCount = 0;
   simulateLostSaveAcknowledgement = false;
@@ -69,19 +86,19 @@ class FakeContactPrereportStore implements ContactPrereportStore {
     return lead;
   }
 
-  async loadReport(reportFileId: number): Promise<string | null> {
+  async loadReport(reportFileId: number): Promise<GeneratedContactPrereport | null> {
     return this.reportFiles.get(reportFileId) ?? null;
   }
 
   async saveReport(
     job: ClaimedContactPrereportJob,
     _lead: ContactLeadData,
-    html: string,
+    report: GeneratedContactPrereport,
   ): Promise<number | null> {
     if (!this.isCurrent(job)) return null;
     this.reportStatus = "completed";
     this.reportFileId ??= 1;
-    this.reportFiles.set(this.reportFileId, html);
+    this.reportFiles.set(this.reportFileId, report);
     if (this.simulateLostSaveAcknowledgement) {
       this.simulateLostSaveAcknowledgement = false;
       throw new Error("Simulated database acknowledgement loss");
@@ -131,8 +148,14 @@ class FakeContactPrereportStore implements ContactPrereportStore {
     return true;
   }
 
-  async finish(job: ClaimedContactPrereportJob): Promise<"completed" | "needs_review" | "lease_lost"> {
+  finishedAttribution: unknown = null;
+
+  async finish(
+    job: ClaimedContactPrereportJob,
+    engineAttribution: typeof testAttribution,
+  ): Promise<"completed" | "needs_review" | "lease_lost"> {
     if (!this.isCurrent(job)) return "lease_lost";
+    this.finishedAttribution = engineAttribution;
     this.status = [this.emailStatus, this.klaviyoStatus].some(
       state => state === "attempting" || state === "unknown" || state === "failed",
     ) ? "needs_review" : "completed";
@@ -158,7 +181,7 @@ class FakeContactPrereportStore implements ContactPrereportStore {
 
 function createServices() {
   return {
-    generateReport: vi.fn(async () => "<html>one report</html>"),
+    generateReport: vi.fn(async () => testReport),
     sendEmail: vi.fn(async () => "sent" as const),
     sendKlaviyo: vi.fn(async () => "sent" as const),
   } satisfies ContactPrereportServices;
@@ -179,13 +202,14 @@ describe("contact pre-report recovery worker", () => {
     expect(services.sendKlaviyo).toHaveBeenCalledTimes(1);
     expect(store.reportFiles.size).toBe(1);
     expect(store.status).toBe("completed");
+    expect(store.finishedAttribution).toEqual(testAttribution);
   });
 
   it("never automatically retries an email with an uncertain outcome", async () => {
     const store = new FakeContactPrereportStore();
     store.reportStatus = "completed";
     store.reportFileId = 7;
-    store.reportFiles.set(7, "<html>saved report</html>");
+    store.reportFiles.set(7, { ...testReport, html: "<html>saved report</html>" });
     store.klaviyoStatus = "sent";
     const services = createServices();
     services.sendEmail.mockRejectedValueOnce(new Error("Simulated interrupted send"));

@@ -1,4 +1,8 @@
 import type { ContactLeadData } from "./contact-idempotency.js";
+import type {
+  ContactPrereportEngineAttribution,
+  GeneratedContactPrereport,
+} from "./contact-prereport-attribution.js";
 import { logger } from "./logger.js";
 
 export type ContactDeliveryChannel = "email" | "klaviyo";
@@ -18,8 +22,8 @@ export interface ContactPrereportStore {
   claimNext(): Promise<ClaimedContactPrereportJob | null>;
   renewLease(job: ClaimedContactPrereportJob): Promise<boolean>;
   loadLead(submissionId: string): Promise<ContactLeadData>;
-  loadReport(reportFileId: number): Promise<string | null>;
-  saveReport(job: ClaimedContactPrereportJob, lead: ContactLeadData, html: string): Promise<number | null>;
+  loadReport(reportFileId: number): Promise<GeneratedContactPrereport | null>;
+  saveReport(job: ClaimedContactPrereportJob, lead: ContactLeadData, report: GeneratedContactPrereport): Promise<number | null>;
   beginDeliveryAttempt(job: ClaimedContactPrereportJob, channel: ContactDeliveryChannel): Promise<boolean>;
   finishDeliveryAttempt(
     job: ClaimedContactPrereportJob,
@@ -28,11 +32,14 @@ export interface ContactPrereportStore {
   ): Promise<boolean>;
   failReport(job: ClaimedContactPrereportJob, errorCode: string): Promise<"retry" | "failed" | "lease_lost">;
   failJob(job: ClaimedContactPrereportJob, errorCode: string): Promise<boolean>;
-  finish(job: ClaimedContactPrereportJob): Promise<"completed" | "needs_review" | "lease_lost">;
+  finish(
+    job: ClaimedContactPrereportJob,
+    engineAttribution: ContactPrereportEngineAttribution,
+  ): Promise<"completed" | "needs_review" | "lease_lost">;
 }
 
 export interface ContactPrereportServices {
-  generateReport(lead: ContactLeadData, submissionId: string): Promise<string>;
+  generateReport(lead: ContactLeadData, submissionId: string): Promise<GeneratedContactPrereport>;
   sendEmail(lead: ContactLeadData, reportHtml: string): Promise<"sent" | "skipped" | "failed">;
   sendKlaviyo(lead: ContactLeadData): Promise<"sent" | "skipped" | "failed">;
 }
@@ -94,7 +101,7 @@ export async function processNextContactPrereportJob(
 
   try {
     const lead = await store.loadLead(job.submissionId);
-    let reportHtml: string | null = null;
+    let report: GeneratedContactPrereport | null = null;
 
     // Keep the current fast marketing notification independent of slow report generation.
     const klaviyoSaved = await deliverOnce(store, job, "klaviyo", () => services.sendKlaviyo(lead));
@@ -103,9 +110,14 @@ export async function processNextContactPrereportJob(
 
     if (job.reportStatus === "generating" || job.reportStatus === "pending") {
       try {
-        reportHtml = await services.generateReport(lead, job.submissionId);
+        report = await services.generateReport(lead, job.submissionId);
+        if (!report.html.trim()) {
+          const error = new Error("Generated pre-report HTML was empty");
+          error.name = "ContactPrereportEmptyReport";
+          throw error;
+        }
         if (leaseLost) return "lease_lost";
-        const reportFileId = await store.saveReport(job, lead, reportHtml);
+        const reportFileId = await store.saveReport(job, lead, report);
         if (reportFileId === null) {
           leaseLost = true;
           return "lease_lost";
@@ -124,19 +136,19 @@ export async function processNextContactPrereportJob(
     }
 
     if (leaseLost) return "lease_lost";
-    if (!reportHtml && job.reportFileId !== null) reportHtml = await store.loadReport(job.reportFileId);
-    if (!reportHtml) {
+    if (!report && job.reportFileId !== null) report = await store.loadReport(job.reportFileId);
+    if (!report?.html.trim()) {
       const saved = await store.failJob(job, "ReportUnavailable");
       if (!saved) return "lease_lost";
       logger.error({ submissionId: job.submissionId }, "Contact pre-report file is unavailable");
       return "processed";
     }
 
-    const emailSaved = await deliverOnce(store, job, "email", () => services.sendEmail(lead, reportHtml!));
+    const emailSaved = await deliverOnce(store, job, "email", () => services.sendEmail(lead, report!.html));
     if (!emailSaved) return "lease_lost";
     if (leaseLost) return "lease_lost";
 
-    const finalStatus = await store.finish(job);
+    const finalStatus = await store.finish(job, report.engineAttribution);
     if (finalStatus === "lease_lost") return "lease_lost";
     if (finalStatus === "needs_review") {
       logger.warn({ submissionId: job.submissionId }, "Contact pre-report delivery needs manual review");

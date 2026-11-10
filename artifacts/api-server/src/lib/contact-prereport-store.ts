@@ -3,6 +3,11 @@ import { and, eq } from "drizzle-orm";
 import { db, pool, auditLogTable, contactPrereportJobsTable } from "@workspace/db";
 import { projectFilesTable } from "@workspace/db/schema";
 import type { ContactLeadData } from "./contact-idempotency.js";
+import {
+  parseContactPrereportEngineAttribution,
+  type GeneratedContactPrereport,
+  type ContactPrereportEngineAttribution,
+} from "./contact-prereport-attribution.js";
 import type {
   ClaimedContactPrereportJob,
   ContactDeliveryChannel,
@@ -140,16 +145,34 @@ export class PostgresContactPrereportStore implements ContactPrereportStore {
     return lead as ContactLeadData;
   }
 
-  async loadReport(reportFileId: number): Promise<string | null> {
-    const [file] = await db.select({ content: projectFilesTable.content })
+  async loadReport(reportFileId: number): Promise<GeneratedContactPrereport | null> {
+    const [file] = await db.select({
+      content: projectFilesTable.content,
+      metadata: projectFilesTable.metadata,
+    })
       .from(projectFilesTable).where(eq(projectFilesTable.id, reportFileId)).limit(1);
-    return file?.content ?? null;
+    if (!file?.content) return null;
+
+    let metadata: Record<string, unknown> = {};
+    try {
+      const parsed: unknown = JSON.parse(file.metadata || "{}");
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        metadata = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Older or malformed metadata must not prevent delivery of a saved report.
+    }
+
+    return {
+      html: file.content,
+      engineAttribution: parseContactPrereportEngineAttribution(metadata.engineAttribution),
+    };
   }
 
   async saveReport(
     job: ClaimedContactPrereportJob,
     lead: ContactLeadData,
-    html: string,
+    report: GeneratedContactPrereport,
   ): Promise<number | null> {
     return db.transaction(async tx => {
       const [current] = await tx.select({
@@ -162,7 +185,7 @@ export class PostgresContactPrereportStore implements ContactPrereportStore {
       )).for("update").limit(1);
       if (!current) return null;
 
-      const content = Buffer.from(html, "utf-8");
+      const content = Buffer.from(report.html, "utf-8");
       const now = new Date();
       const date = now.toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
       const time = now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -189,8 +212,9 @@ export class PostgresContactPrereportStore implements ContactPrereportStore {
           leadStoreUrl: lead.storeUrl,
           leadPhone: lead.phone,
           leadServices: lead.services,
+          engineAttribution: report.engineAttribution,
         }),
-        content: html,
+        content: report.html,
         isPublic: 0,
         entityName: lead.name,
         entityUrl: lead.storeUrl || lead.email,
@@ -293,7 +317,10 @@ export class PostgresContactPrereportStore implements ContactPrereportStore {
     return updated.length > 0;
   }
 
-  async finish(job: ClaimedContactPrereportJob): Promise<"completed" | "needs_review" | "lease_lost"> {
+  async finish(
+    job: ClaimedContactPrereportJob,
+    engineAttribution: ContactPrereportEngineAttribution,
+  ): Promise<"completed" | "needs_review" | "lease_lost"> {
     return db.transaction(async tx => {
       const [current] = await tx.select({
         submissionId: contactPrereportJobsTable.submissionId,
@@ -318,7 +345,8 @@ export class PostgresContactPrereportStore implements ContactPrereportStore {
         action: "lead_prereport_generated",
         details: JSON.stringify({
           emailSent: current.emailStatus === "sent",
-          aiEngine: "claude-anthropic",
+          aiEngine: engineAttribution.summary.overall,
+          engineAttribution,
           savedFileId: current.reportFileId,
           generatedAt: new Date().toISOString(),
         }),

@@ -351,11 +351,16 @@ async function askGemini(prompt: string, systemInstruction?: string, useProModel
 // askGemini. A modest thinkingBudget gives real reasoning while staying fast.
 export interface GeminiChatMessage { role: "user" | "assistant"; content: string }
 
-export async function askGeminiChat(
+export interface GeminiChatResult {
+  text: string;
+  engine: "gemini" | "claude-anthropic" | "unavailable";
+}
+
+export async function askGeminiChatDetailed(
   messages: GeminiChatMessage[],
   systemInstruction?: string,
   opts: { useProModel?: boolean; maxOutputTokens?: number; thinkingBudget?: number } = {},
-): Promise<string> {
+): Promise<GeminiChatResult> {
   await assertAiBudget();
   const { useProModel = false, maxOutputTokens = 2048, thinkingBudget = 1024 } = opts;
 
@@ -363,7 +368,7 @@ export async function askGeminiChat(
     .filter(m => m.content && (m.role === "user" || m.role === "assistant"))
     .map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
 
-  if (contents.length === 0) return "";
+  if (contents.length === 0) return { text: "", engine: "unavailable" };
 
   const claudeFallback = async (): Promise<string> => {
     const { askClaudeWithBrain } = await import("./claude.js");
@@ -388,15 +393,31 @@ export async function askGeminiChat(
     }
     recordGeminiUsage("askGeminiChat", model, response);
     const text = response.text ?? "";
-    if (text.trim()) return text;
+    if (text.trim()) return { text, engine: "gemini" };
     // Cuerpo vacío (p. ej. el razonamiento agotó el presupuesto) → Claude antes que devolver nada
     logger.warn("[askGeminiChat] Empty Gemini response — falling back to Claude");
-    try { return await claudeFallback(); } catch { return ""; }
+    try {
+      return { text: await claudeFallback(), engine: "claude-anthropic" };
+    } catch {
+      return { text: "", engine: "unavailable" };
+    }
   } catch (err) {
     if (!(err instanceof GeminiUnavailableError)) throw err;
     logger.warn("[askGeminiChat] Gemini no disponible por ninguna vía — Claude");
-    try { return await claudeFallback(); } catch { return ""; }
+    try {
+      return { text: await claudeFallback(), engine: "claude-anthropic" };
+    } catch {
+      return { text: "", engine: "unavailable" };
+    }
   }
+}
+
+export async function askGeminiChat(
+  messages: GeminiChatMessage[],
+  systemInstruction?: string,
+  opts: { useProModel?: boolean; maxOutputTokens?: number; thinkingBudget?: number } = {},
+): Promise<string> {
+  return (await askGeminiChatDetailed(messages, systemInstruction, opts)).text;
 }
 
 // ─── JSON-structured generation ───────────────────────────────────────────────
