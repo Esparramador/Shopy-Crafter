@@ -81,16 +81,30 @@ export async function recordBrainEvent(ev: BrainEventInput): Promise<number | nu
   }
 }
 
-export async function listBrainEvents(opts: { gate?: BrainGate; limit?: number; before?: number }): Promise<{ events: BrainEvent[]; nextBefore: number | null }> {
+export async function listBrainEvents(opts: { gate?: BrainGate; channel?: string; limit?: number; before?: number }): Promise<{ events: BrainEvent[]; nextBefore: number | null }> {
   const limit = Math.min(Math.max(Math.trunc(opts.limit ?? 50) || 50, 1), 200);
   const conds = [];
   if (opts.gate) conds.push(eq(brainEventsTable.gate, opts.gate));
+  if (opts.channel) conds.push(eq(brainEventsTable.channel, opts.channel));
   if (opts.before && opts.before > 0) conds.push(lt(brainEventsTable.id, opts.before));
   const events = await db.select().from(brainEventsTable)
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(desc(brainEventsTable.id))
     .limit(limit);
   return { events, nextBefore: events.length === limit ? events[events.length - 1]!.id : null };
+}
+
+/** Canales que han registrado algo (para el filtro del panel), con su puerta y cuántos eventos. */
+export async function listBrainEventChannels(): Promise<Array<{ channel: string; gate: string; count: number }>> {
+  const rows = await db.select({
+    channel: brainEventsTable.channel,
+    gate: brainEventsTable.gate,
+    count: sql<number>`count(*)::int`,
+  }).from(brainEventsTable)
+    .groupBy(brainEventsTable.channel, brainEventsTable.gate)
+    .orderBy(desc(sql`count(*)`))
+    .limit(100);
+  return rows.map(r => ({ channel: r.channel, gate: r.gate, count: Number(r.count) }));
 }
 
 /** Idempotente: la tabla y sus índices (mismo patrón que client_knowledge). */

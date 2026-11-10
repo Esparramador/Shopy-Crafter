@@ -21,6 +21,7 @@ import {
   type VideoModel as FSPVideoModel,
 } from "../lib/fusion-studio-pro.js";
 import { withTimeout } from "../lib/with-timeout.js";
+import { trackStudioRun } from "../lib/brain/studio-report.js";
 
 const REPLICATE_TIMEOUT_MS = 5 * 60_000;
 const TRYON_MODES = new Set(["tryon-front", "tryon-back", "tryon-lifestyle"]);
@@ -301,6 +302,10 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 
 
 router.post("/fusion-studio/analyze", upload.array("images", 5), async (req: Request, res: Response) => {
   enableLongRunning(res);
+  trackStudioRun(req, res, {
+    studio: "fusion", operation: "analyze",
+    input: r => [`${(r.files as unknown[] | undefined)?.length ?? 0} imagen(es)`, r.body?.niche && `nicho: ${r.body.niche}`, r.body?.brandTone && `tono: ${r.body.brandTone}`].filter(Boolean).join(" · "),
+  });
   
   try {
     const files = req.files as Express.Multer.File[] | undefined;
@@ -507,6 +512,11 @@ router.post("/fusion-studio/auto-suggest", async (req: Request, res: Response) =
 
 router.post("/fusion-studio/generate-photos", upload.array("images", 10), async (req: Request, res: Response) => {
   enableLongRunning(res);
+  trackStudioRun(req, res, {
+    studio: "fusion", operation: "generate-photos",
+    input: r => [`${(r.files as unknown[] | undefined)?.length ?? 0} imagen(es)`, r.body?.modes && `modos: ${r.body.modes}`, r.body?.quantity && `cantidad: ${r.body.quantity}`, r.body?.extraPrompt].filter(Boolean).join(" · "),
+    params: r => ({ modes: r.body?.modes, quantity: r.body?.quantity, outputFormat: r.body?.outputFormat }),
+  });
 
   try {
     const files = req.files as Express.Multer.File[] | undefined;
@@ -1489,6 +1499,11 @@ router.get("/fusion-studio/video-models", (_req: Request, res: Response): void =
 
 router.post("/fusion-studio/generate-video", async (req: Request, res: Response): Promise<void> => {
   enableLongRunning(res);
+  trackStudioRun(req, res, {
+    studio: "fusion", operation: "generate-video",
+    input: r => r.body?.promptText,
+    params: r => ({ model: r.body?.model, duration: r.body?.duration, ratio: r.body?.ratio, withImage: !!r.body?.imageUrl }),
+  });
   try {
     const userId = (req.session as any)?.userId;
     if (!userId) {
