@@ -2518,6 +2518,9 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
       } else if (j.agents && typeof j.agents === "object") {
         setTuningApplyResults(previous => agentTypes ? { ...previous, ...j.agents } : j.agents);
       }
+      // La aplicación ya terminó: el botón vuelve en cuanto responde el servidor.
+      // La salud (hasta 20 s contra ElevenLabs) se refresca después, sin bloquearlo.
+      setTuningApplying(false);
       if (!r.ok) {
         setTuningApplied(false);
         setTuningErr(j.error || "No se pudieron aplicar los ajustes a todos los agentes.");
@@ -2529,6 +2532,7 @@ function AudioToolsTab({ onInfo, onError }: { projectId: number; onInfo: (m: str
       await loadHealth();
       return true;
     } catch (e: any) {
+      setTuningApplying(false);
       setTuningApplied(false);
       setTuningErr(e.message || "No se pudieron aplicar los ajustes guardados.");
       await loadHealth();

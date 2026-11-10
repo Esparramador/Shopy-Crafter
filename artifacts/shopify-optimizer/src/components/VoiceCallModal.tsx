@@ -291,7 +291,7 @@ export default function VoiceCallModal({ onClose, API, mode = "admin" }: { onClo
           <div style={{ fontSize: 18, fontWeight: 700, color: "var(--t)", marginBottom: 4 }}>
             {isClientMode ? "Consultar Informes — Voz" : "Asistente IA — Voz"}
           </div>
-          <div style={{ fontSize: 13, color: statusColor[status] ?? "var(--jade)", fontWeight: 600 }}>
+          <div data-testid="voice-call-status" style={{ fontSize: 13, color: statusColor[status] ?? "var(--jade)", fontWeight: 600 }}>
             {statusLabel[status]}
           </div>
           {status === "provisioning" && (
