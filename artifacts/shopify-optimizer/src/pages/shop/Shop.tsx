@@ -104,11 +104,23 @@ export default function Shop() {
   const heroRef = useRef<HTMLElement>(null);
   const progress = useRef(0);
   const root = useRef<HTMLDivElement>(null);
+  const workshopVideo = useRef<HTMLVideoElement>(null);
   const flipState = useRef<Flip.FlipState | null>(null);
   const promoPrice = useRef<HTMLElement>(null);
 
   useEffect(() => {
     loadCatalog().then(setData).catch(e => setError(e instanceof Error ? e.message : "Error"));
+  }, []);
+
+  useEffect(() => {
+    const video = workshopVideo.current;
+    if (!video || prefersReduced() || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      ([entry]) => entry.isIntersecting ? video.play().catch(() => {}) : video.pause(),
+      { threshold: 0.4 },
+    );
+    observer.observe(video);
+    return () => observer.disconnect();
   }, []);
 
   // Retrasa el módulo 3D hasta que la página ya haya pintado el contenido principal.
@@ -176,7 +188,7 @@ export default function Shop() {
     if (!data || !root.current || prefersReduced()) return;
     const ctx = gsap.context(() => {
       gsap.utils.toArray<HTMLElement>(".shop-reveal").forEach(el => {
-        gsap.from(el, { y: 50, opacity: 0, duration: 0.9, ease: "power3.out", scrollTrigger: { trigger: el, start: "top 88%", once: true } });
+        gsap.from(el, { y: 50, opacity: 0, duration: 0.9, ease: "power3.out", immediateRender: false, scrollTrigger: { trigger: el, start: "top 88%", once: true } });
       });
       ScrollTrigger.batch(".shop-card", {
         start: "top 92%", once: true,
@@ -184,9 +196,9 @@ export default function Shop() {
       });
       // Bloque de tarjetas: imagen con parallax y precio que cuenta hasta el precio de catálogo.
       gsap.fromTo(".shop-offer-media img", { yPercent: -12, scale: 1.15 }, { yPercent: 12, scale: 1.05, ease: "none", scrollTrigger: { trigger: ".shop-offer", start: "top bottom", end: "bottom top", scrub: true } });
-      gsap.fromTo(promoPrice.current, { scale: 0.4, opacity: 0, rotate: -8 }, { scale: 1, opacity: 1, rotate: 0, duration: 1.1, ease: "elastic.out(1, 0.45)", scrollTrigger: { trigger: ".shop-offer", start: "top 75%", once: true } });
-      gsap.from(".shop-offer-list li", { x: -30, opacity: 0, stagger: 0.08, duration: 0.6, ease: "power3.out", scrollTrigger: { trigger: ".shop-offer", start: "top 70%", once: true } });
-      gsap.from(".shop-band", { scale: 0.92, opacity: 0, duration: 1, ease: "expo.out", scrollTrigger: { trigger: ".shop-band", start: "top 85%", once: true } });
+      gsap.fromTo(promoPrice.current, { scale: 0.4, opacity: 0, rotate: -8 }, { scale: 1, opacity: 1, rotate: 0, duration: 1.1, ease: "elastic.out(1, 0.45)", immediateRender: false, scrollTrigger: { trigger: ".shop-offer", start: "top 75%", once: true } });
+      gsap.from(".shop-offer-list li", { x: -30, opacity: 0, stagger: 0.08, duration: 0.6, ease: "power3.out", immediateRender: false, scrollTrigger: { trigger: ".shop-offer", start: "top 70%", once: true } });
+      gsap.from(".shop-band", { scale: 0.92, opacity: 0, duration: 1, ease: "expo.out", immediateRender: false, scrollTrigger: { trigger: ".shop-band", start: "top 85%", once: true } });
     }, root);
     return () => ctx.revert();
   }, [data, cardFrom]);
@@ -290,7 +302,7 @@ export default function Shop() {
 
         <section className="shop-wrap shop-workshop shop-reveal" aria-labelledby="taller-h">
           <div className="shop-workshop-video">
-            <video src={assetUrl("/tienda-media/taller-grabado-tarjeta.mp4")} poster={assetUrl("/tienda-media/taller-grabado-tarjeta-poster.webp")} ref={el => { if (!el || prefersReduced()) return; new IntersectionObserver(([en]) => { if (en.isIntersecting) el.play().catch(() => {}); else el.pause(); }, { threshold: 0.4 }).observe(el); }} muted loop playsInline preload="none" aria-label="Una tarjeta grabándose en la xTool F2" />
+            <video ref={workshopVideo} src={assetUrl("/tienda-media/taller-grabado-tarjeta.mp4")} poster={assetUrl("/tienda-media/taller-grabado-tarjeta-poster.webp")} muted loop playsInline preload="none" aria-label="Una tarjeta grabándose en la xTool F2" />
           </div>
           <div>
             <span className="shop-eyebrow">Del taller a tu mostrador</span>

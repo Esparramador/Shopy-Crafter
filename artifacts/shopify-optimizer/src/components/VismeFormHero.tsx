@@ -5,9 +5,9 @@
  *  • Video fills the entire fp-section (position: absolute; inset: 0)
  *  • Dark gradient darkens the right ~45% for form readability
  *  • Character (left-aligned in video) is always fully visible
- *  • Right panel: section title (always) + form (builds from t=4.5s)
+ *  • Right panel: section title and working form are available immediately
  *
- * Form construction (t=4.5s → t=7.5s):
+ * Form entrance (on first render):
  *  Phase 1 (+0ms)     — panel slides in + heading TypewriterText
  *  Phase 2 (+1450ms)  — Name/Email fields appear (slide + border glow)
  *  Phase 3 (+2150ms)  — Phone field
@@ -109,7 +109,7 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
   const [refPrev,  setRefPrev] = useState<string | null>(null);
 
   // Video / build state
-  const [formReady] = useState(true);
+  const formReady = true;
   const buildPhase = 5;
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef  = useRef<HTMLDivElement>(null);
@@ -480,24 +480,6 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
               Análisis de tu tienda, mercado y competencia — 100% gratis.
             </p>
           </div>
-
-          {/* ── WAITING HINT (before t=4.5s) ─────────────────────────────── */}
-          {!formReady && !isSuccess && (
-            <div style={{
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center",
-              gap: 10, padding: "20px 0", textAlign: "center",
-              color: "rgba(200,168,75,.4)",
-            }}>
-              <span style={{ fontSize: 28, animation: "vfhBob 2.2s ease-in-out infinite" }}>🎩</span>
-              <p style={{ margin: 0, fontSize: 12.5, fontStyle: "italic", lineHeight: 1.55 }}>
-                Observa cómo Alec<br />sale del cuadro…
-              </p>
-              <button type="button" onClick={() => setFormReady(true)} style={{ color: "var(--gold, #c8a84b)", background: "none", border: 0, cursor: "pointer", minHeight: 44, textDecoration: "underline" }}>
-                Abrir formulario sin esperar
-              </button>
-            </div>
-          )}
 
           {/* ── SUCCESS ──────────────────────────────────────────────────── */}
           {isSuccess && (

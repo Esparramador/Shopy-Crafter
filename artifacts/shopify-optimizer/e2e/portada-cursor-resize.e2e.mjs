@@ -34,6 +34,9 @@ try {
   const page = await context.newPage();
   const errors = trackPageErrors(page);
   await openPublic(page, "/", ".fp-cursor-glow");
+  // The Replit dev banner is injected above the site and can cover the mobile
+  // burger in a desktop-sized viewport; keep the test focused on app UI.
+  await page.addStyleTag({ content: "#replit-dev-banner{display:none!important}" });
   await page.locator(".l-nav-links").waitFor({ state: "visible", timeout: 20_000 });
 
   // Ratón activo antes de redimensionar.

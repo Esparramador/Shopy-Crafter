@@ -319,8 +319,12 @@ const CSS = `
 }
 @media (max-height: 560px) and (orientation: landscape) {
   .ctc-layout { flex-direction: row; }
-  .ctc-panel { width: 55%; padding: 12px 20px 12px 16px; justify-content: flex-start; overflow-y: auto; }
-  .ctc-left { width: 45%; padding: 0 12px 24px; align-items: flex-end; }
+  .ctc-panel {
+    order: 1; width: 55%; padding: 12px 20px 12px 16px; justify-content: flex-start; overflow-y: auto;
+    background: linear-gradient(180deg, rgba(5,3,12,.92), rgba(5,3,12,.98));
+    border-left: 1px solid rgba(200,168,75,.12);
+  }
+  .ctc-left { order: 0; width: 45%; padding: 0 12px 24px; align-items: flex-end; }
   .ctc-building { padding: 16px 16px; }
   .ctc-build-orb { width: 48px; height: 48px; font-size: 18px; margin-bottom: 14px; }
   .ctc-card { padding: 12px 8px 10px; }
@@ -427,6 +431,10 @@ export default function Contacto() {
   /* ── launch typewriter when form appears ── */
   useEffect(() => {
     if (!formReady || demoActive || demoDone) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setDemoDone(true);
+      return;
+    }
     const t = setTimeout(() => setDemoActive(true), 500);
     return () => clearTimeout(t);
   }, [formReady, demoActive, demoDone]);

@@ -16,6 +16,8 @@ try {
   const page = await context.newPage();
   const errors = trackPageErrors(page);
   await openPublic(page, "/", ".fp-cursor-glow");
+  // The dev-only Replit banner overlays the site's header in this browser.
+  await page.addStyleTag({ content: "#replit-dev-banner{display:none!important}" });
   await page.locator(".l-nav-links").waitFor({ state: "visible", timeout: 20_000 });
   // Marca en window: si la página se recargase entera, desaparecería.
   await page.evaluate(() => { window.__e2eSinRecarga = true; });

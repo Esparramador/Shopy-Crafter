@@ -771,10 +771,14 @@ select.input-field { cursor: pointer; }
 
 /* ── REVEAL ANIMATIONS ── */
 .reveal {
-  opacity: 0; transform: translateY(20px);
+  opacity: 1; transform: none;
   transition: opacity 0.5s ease, transform 0.5s ease;
 }
-.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal.visible { animation: reveal-enter 0.5s ease both; }
+@keyframes reveal-enter {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
 .delay-1 { transition-delay: 0.08s; }
 .delay-2 { transition-delay: 0.16s; }
 .delay-3 { transition-delay: 0.24s; }
@@ -1352,7 +1356,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+  }
+  .reveal, .l-reveal, .fp-animate, .fp-animated {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
   }
 }
 
@@ -1829,7 +1839,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* ── Layout principal del nav (fixed + flex row) ── */
 .l-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-  height: 64px;
+  height: 64px; --l-nav-height: 64px;
   display: flex; align-items: center;
   padding: 0 36px; gap: 36px;
 }
@@ -2141,8 +2151,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* REVEAL ANIMATIONS */
 @keyframes l-fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-.l-reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.l-reveal { opacity: 1; transform: none; transition: opacity 0.7s ease, transform 0.7s ease; }
 .l-visible { opacity: 1; transform: translateY(0); }
+.l-reveal.l-visible { animation: l-fadeUp 0.7s ease both; }
 .l-delay-1 { transition-delay: 0.1s; }
 .l-delay-2 { transition-delay: 0.2s; }
 .l-delay-3 { transition-delay: 0.3s; }
@@ -2408,8 +2419,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* ── ENTRANCE ANIMATIONS ── */
 .fp-animate {
-  opacity: 0;
-  transform: translateY(28px);
+  opacity: 1;
+  transform: none;
 }
 .fp-animated {
   animation: fp-enter 0.7s ease both;
@@ -3202,7 +3213,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   /* Cancel the margin-top added by ≤768px CSS — first-section padding handles the nav offset */
   .fp-container { margin-top: 0 !important; }
   /* Compact nav in landscape */
-  .l-nav { height: 48px !important; padding: 0 16px !important; }
+  .l-nav { height: 48px !important; --l-nav-height: 48px; padding: 0 16px !important; }
   .l-nav-gem { width: 24px !important; height: 24px !important; font-size: 12px !important; }
   .l-nav-logo-text { font-size: 15px !important; }
   .l-root {
@@ -3384,7 +3395,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   /* Nav: esconder botón ghost, solo logo + botón gold */
   .l-nav {
     padding: 0 16px;
-    height: 56px;
+    height: 56px; --l-nav-height: 56px;
     background: rgba(6,6,14,0.88) !important;
     backdrop-filter: blur(20px) saturate(1.4) !important;
     border-bottom: 1px solid rgba(200,168,75,0.07) !important;
@@ -3569,7 +3580,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
    Very small Androids, old budget phones
 ════════════════════════════════════════════════════ */
 @media (max-width: 360px) {
-  .l-nav { padding: 0 10px; height: 50px; }
+  .l-nav { padding: 0 10px; height: 50px; --l-nav-height: 50px; }
   .l-nav-logo-text { font-size: 14px; }
 
   .fp-section:first-child { padding-top: 64px !important; }
@@ -5367,8 +5378,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 /* ── Animación de entrada de secciones más suave ── */
 .fp-animate {
-  opacity: 0;
-  transform: translateY(28px);
+  opacity: 1;
+  transform: none;
   transition: opacity 0.65s cubic-bezier(0.22,1,0.36,1), transform 0.65s cubic-bezier(0.22,1,0.36,1);
 }
 .fp-animated {

@@ -11,6 +11,7 @@ export default function SCCursor() {
     let raf = 0;
     let animating = false;
     let cursorVisible = false;
+    let lastFrameTime = 0;
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     let prefersReducedMotion = reducedMotion?.matches ?? false;
 
@@ -43,14 +44,17 @@ export default function SCCursor() {
     // La posición va en la propiedad `translate`, no en `transform`: el aumento al pasar por un enlace usa
     // `scale`, y el navegador aplica `scale` también sobre lo que hay en `transform`, así que con transform
     // el desplazamiento se multiplicaba por 1,15 y el cursor saltaba ~100 px lejos del ratón.
-    const anim = () => {
+    const anim = (now: number) => {
       if (!animating) return;
+      const frameDelta = lastFrameTime ? Math.min(now - lastFrameTime, 64) : 16;
+      lastFrameTime = now;
+      const followFactor = 1 - Math.exp(-frameDelta / 42);
       if (dotRef.current) {
         dotRef.current.style.translate = `${mx.current - 14}px ${my.current - 14}px`;
       }
       if (ringRef.current) {
-        rx.current += (mx.current - rx.current) * 0.12;
-        ry.current += (my.current - ry.current) * 0.12;
+        rx.current += (mx.current - rx.current) * followFactor;
+        ry.current += (my.current - ry.current) * followFactor;
         ringRef.current.style.translate = `${rx.current - 22}px ${ry.current - 22}px`;
       }
       raf = requestAnimationFrame(anim);
@@ -69,6 +73,7 @@ export default function SCCursor() {
       dotRef.current?.classList.remove("sc-cursor-visible", "sc-cursor-hover");
       ringRef.current?.classList.remove("sc-cursor-visible", "sc-ring-hover");
       stopAnimation();
+      lastFrameTime = 0;
       mx.current = my.current = rx.current = ry.current = 0;
       if (dotRef.current) dotRef.current.style.translate = "";
       if (ringRef.current) ringRef.current.style.translate = "";
