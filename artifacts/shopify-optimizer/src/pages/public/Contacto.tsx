@@ -133,7 +133,7 @@ const CSS = `
   padding: 20px 14px 18px;
   border-radius: 18px; border: 1px solid;
   text-align: center; backdrop-filter: blur(16px);
-  opacity: 0; transform: translateY(32px) scale(.95);
+  opacity: 1; transform: none;
   transition: opacity 0.6s cubic-bezier(.22,1,.36,1), transform 0.6s cubic-bezier(.22,1,.36,1);
 }
 .ctc-card:first-child { flex-basis: 220px; max-width: 220px; }
@@ -226,7 +226,7 @@ const CSS = `
 
 /* ─── FORM FIELDS ─── */
 .ctc-form-wrap { display: flex; flex-direction: column; gap: 18px; }
-.ctc-field { opacity: 0; transform: translateY(16px); }
+.ctc-field { opacity: 1; transform: none; }
 .ctc-form-ready .ctc-field { animation: ctcFieldIn 0.52s cubic-bezier(.22,1,.36,1) forwards; }
 .ctc-form-ready .ctc-field:nth-child(1) { animation-delay: 0ms; }
 .ctc-form-ready .ctc-field:nth-child(2) { animation-delay: 60ms; }
@@ -371,8 +371,8 @@ export default function Contacto() {
     const asunto = new URLSearchParams(window.location.search).get("asunto")?.trim().slice(0, 120);
     if (asunto) setForm(f => (f.message ? f : { ...f, message: `Me interesa: ${asunto}. ` }));
   }, []);
-  const [cardPhase, setCardPhase] = useState(0);
-  const [formReady, setFormReady] = useState(false);
+  const [cardPhase, setCardPhase] = useState(3);
+  const [formReady, setFormReady] = useState(true);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

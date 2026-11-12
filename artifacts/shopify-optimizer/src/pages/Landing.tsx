@@ -16,6 +16,10 @@ function SectionVideoBg({ src }: { src: string }) {
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      if (document.visibilityState === "visible") el.play().catch(() => {});
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -433,6 +437,10 @@ export default function Landing() {
     currentRef.current = 0;
 
     const sections = [...document.querySelectorAll<HTMLElement>(".fp-section")];
+    if (typeof IntersectionObserver === "undefined") {
+      setAnimatedSections(new Set(FP_SECTION_IDS));
+      return;
+    }
     const obs = new IntersectionObserver(entries => {
       entries.forEach(e => {
         // Una sección mucho más alta que la pantalla (Proyectos, con sus tarjetas apiladas) nunca llega a

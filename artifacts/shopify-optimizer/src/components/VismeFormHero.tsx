@@ -26,7 +26,6 @@ import { notifyShopyControl } from "@/lib/shopy-control";
 const BASE_URL   = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
 const VIDEO_SRC  = `${BASE_URL}/assets/videos/alec_landing.mp4`;
 const POSTER_SRC = `${BASE_URL}/assets/videos/alec_poster.jpg`;
-const TRIGGER_TIME = 4.5;  // seconds — umbrella fully closed
 
 // ── TypewriterText ────────────────────────────────────────────────────────────
 function TypewriterText({ text, delay = 0, speed = 62 }: {
@@ -110,9 +109,8 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
   const [refPrev,  setRefPrev] = useState<string | null>(null);
 
   // Video / build state
-  const [formReady,  setFormReady]  = useState(false);
-  const [buildPhase, setBuildPhase] = useState(0);   // 0..5
-  const formFallbackRef = useRef(false);
+  const [formReady] = useState(true);
+  const buildPhase = 5;
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef  = useRef<HTMLDivElement>(null);
 
@@ -123,22 +121,12 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
     setStatus(st => (st === "sent" ? "idle" : st));
   }, [prefill?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // El formulario no debe quedar oculto si el vídeo no carga o no puede avanzar.
-  useEffect(() => {
-    if (formReady) return;
-    const timeout = window.setTimeout(() => {
-      formFallbackRef.current = true;
-      setFormReady(true);
-    }, 6500);
-    return () => window.clearTimeout(timeout);
-  }, [formReady]);
-
   // isActive prop — play/pause based on whether the landing section is active
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     if (isActive) {
-      v.play().catch(() => setFormReady(true));
+      v.play().catch(() => {});
     } else {
       v.pause();
     }
@@ -146,34 +134,18 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
 
   // IntersectionObserver — fallback: play when visible, pause when hidden
   useEffect(() => {
+    const v = videoRef.current;
+    if (!v || typeof IntersectionObserver === "undefined") return;
     const obs = new IntersectionObserver(
       ([entry]) => {
-        const v = videoRef.current;
-        if (!v) return;
-        entry.isIntersecting ? v.play().catch(() => setFormReady(true)) : v.pause();
+        if (entry.isIntersecting) v.play().catch(() => {});
+        else v.pause();
       },
       { threshold: 0.10 }
     );
     if (rootRef.current) obs.observe(rootRef.current);
     return () => obs.disconnect();
   }, []);
-
-  // Media is decorative: blocked autoplay, a stalled download or a short video
-  // must never prevent a visitor from reaching the actual contact form.
-  useEffect(() => {
-    if (!isActive || formReady) return;
-    const timer = setTimeout(() => setFormReady(true), 6500);
-    return () => clearTimeout(timer);
-  }, [isActive, formReady]);
-
-  // timeupdate — trigger form at t=4.5s
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onTime = () => { if (v.currentTime >= TRIGGER_TIME && !formReady) setFormReady(true); };
-    v.addEventListener("timeupdate", onTime);
-    return () => v.removeEventListener("timeupdate", onTime);
-  }, [formReady]);
 
   // ended — freeze on last frame (seek back 0.05s before end)
   useEffect(() => {
@@ -183,21 +155,6 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
     v.addEventListener("ended", onEnded);
     return () => v.removeEventListener("ended", onEnded);
   }, []);
-
-  // Build phases cascade (starts when formReady becomes true)
-  useEffect(() => {
-    if (!formReady) return;
-    if (formFallbackRef.current) {
-      setBuildPhase(5);
-      return;
-    }
-    setBuildPhase(1);
-    const t2 = setTimeout(() => setBuildPhase(2), 1450);  // Name+Email
-    const t3 = setTimeout(() => setBuildPhase(3), 2150);  // Phone
-    const t4 = setTimeout(() => setBuildPhase(4), 2800);  // Button
-    const t5 = setTimeout(() => setBuildPhase(5), 3300);  // Dots
-    return () => { clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); clearTimeout(t5); };
-  }, [formReady]);
 
   // Form helpers
   const set = (f: keyof ContactForm) =>
@@ -482,7 +439,6 @@ export function VismeFormHero({ isActive = false, prefill }: { isActive?: boolea
           muted
           playsInline
           preload="metadata"
-          onError={() => setFormReady(true)}
         />
 
         {/* ── Gradient overlay ──────────────────────────────────────────────── */}

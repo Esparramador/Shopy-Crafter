@@ -205,10 +205,15 @@ export default function ProjectsShowcase({ onContact }: Props) {
     let raf = 0;
 
     // Entrada: cada tarjeta se «enciende» la primera vez que asoma.
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-in"); io.unobserve(e.target); } });
-    }, { threshold: 0.18 });
-    cards.forEach(c => io.observe(c));
+    let io: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver === "undefined") {
+      cards.forEach(card => card.classList.add("is-in"));
+    } else {
+      io = new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("is-in"); io?.unobserve(e.target); } });
+      }, { threshold: 0.18 });
+      cards.forEach(c => io?.observe(c));
+    }
 
     const update = () => {
       raf = 0;
@@ -244,7 +249,7 @@ export default function ProjectsShowcase({ onContact }: Props) {
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => {
-      io.disconnect();
+      io?.disconnect();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       if (raf) cancelAnimationFrame(raf);
