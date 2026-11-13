@@ -4,6 +4,9 @@ import { z } from "zod";
 vi.mock("./logger.js", () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
+vi.mock("./api-usage.js", () => ({
+  recordClaudeMessageUsage: vi.fn(),
+}));
 
 import {
   AiJsonError,
