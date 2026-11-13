@@ -7,10 +7,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 const ai = vi.hoisted(() => ({ claude: vi.fn() }));
 
-vi.mock("@workspace/db", async (orig) => {
-  process.env.DATABASE_URL ||= "postgres://test@127.0.0.1:9/none"; // el Pool no conecta
+vi.mock("@workspace/db", async () => {
+  const schema = await import("@workspace/db/schema");
   const { fakeBrainDb } = await import("../test/fake-brain-db.js");
-  return { ...(await orig<object>()), db: fakeBrainDb.db };
+  return {
+    ...schema,
+    db: fakeBrainDb.db,
+    pool: { query: async () => ({ rows: [] }) },
+  };
 });
 vi.mock("../lib/auth.js", () => ({
   requireAdmin: (_req: unknown, _res: unknown, next: () => void) => next(),

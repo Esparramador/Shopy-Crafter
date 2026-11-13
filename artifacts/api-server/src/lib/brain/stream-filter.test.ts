@@ -2,9 +2,14 @@
 // :::ACTION:::, lleguen como lleguen partidos, y el texto normal no se pierde.
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@workspace/db", async (orig) => {
-  process.env.DATABASE_URL ||= "postgres://test@127.0.0.1:9/none"; // el Pool no conecta
-  return { ...(await orig<object>()) };
+vi.mock("@workspace/db", async () => {
+  const schema = await import("@workspace/db/schema");
+  const { fakeBrainDb } = await import("../../test/fake-brain-db.js");
+  return {
+    ...schema,
+    db: fakeBrainDb.db,
+    pool: { query: async () => ({ rows: [] }) },
+  };
 });
 
 import { createActionStreamFilter } from "./router.js";
