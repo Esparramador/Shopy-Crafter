@@ -1,0 +1,162 @@
+/*
+ * ShopyBrain en pantalla: respuesta del cerebro (paleta, buscador) y panel «Cerebro».
+ * Todo sale de los tokens de design-system.css; los tintes se mezclan con
+ * color-mix sobre el token, así el tema claro y el oscuro funcionan solos.
+ */
+.brain-tone-gold { --tone: var(--gold); }
+.brain-tone-sky  { --tone: var(--sky); }
+.brain-tone-jade { --tone: var(--jade); }
+.brain-tone-crim { --tone: var(--crim); }
+.brain-tone-gray { --tone: var(--t3); }
+
+.brain-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.01em;
+  padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tone) 24%, transparent);
+}
+.brain-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tone); flex-shrink: 0; }
+.brain-mono {
+  font-family: var(--fm); font-size: 11px; color: var(--t2);
+  background: var(--ink3); border: 1px solid var(--bdr);
+  padding: 1px 7px; border-radius: 6px; white-space: nowrap;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Respuesta del cerebro ── */
+.brain-answer { display: flex; flex-direction: column; gap: 12px; animation: brain-rise 0.32s var(--ease-spring) both; }
+.brain-answer-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11.5px; color: var(--t3); }
+.brain-answer-orb {
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+  background: radial-gradient(circle at 30% 30%, var(--gold3), var(--gold) 55%, color-mix(in srgb, var(--gold) 40%, var(--ink)) 100%);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--gold) 35%, transparent);
+  color: var(--ink); font-size: 13px;
+}
+.brain-answer-text { font-size: 13.5px; line-height: 1.65; color: var(--t); overflow-wrap: anywhere; }
+.brain-answer-text code { font-size: 11.5px; }
+.brain-answer-actions { display: flex; flex-direction: column; gap: 8px; }
+.brain-action-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: var(--r2);
+  background: color-mix(in srgb, var(--gold) 6%, var(--ink3));
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
+}
+.brain-action-name { font-size: 12.5px; font-weight: 700; color: var(--t); }
+.brain-action-params { font-family: var(--fm); font-size: 10.5px; color: var(--t3); flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain-action-result { flex-basis: 100%; font-size: 12px; line-height: 1.5; }
+.brain-action-result.is-ok { color: var(--jade); }
+.brain-action-result.is-err { color: var(--crim); }
+.brain-action-result.is-cancel { color: var(--t3); }
+
+.brain-skel { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+.brain-skel span {
+  height: 11px; border-radius: 6px;
+  background: linear-gradient(90deg, var(--ink3) 0%, var(--ink5) 50%, var(--ink3) 100%);
+  background-size: 200% 100%; animation: shimmer 1.4s linear infinite;
+}
+.brain-skel span:nth-child(2) { width: 86%; }
+.brain-skel span:nth-child(3) { width: 62%; }
+
+@keyframes brain-rise { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
+@keyframes brain-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.8); } }
+
+/* ── Paleta: opción «Preguntar a ShopyBrain» ── */
+.brain-palette-ask { display: flex; align-items: center; gap: 12px; padding: 12px 18px; cursor: pointer; border-left: 2px solid transparent; transition: background 0.12s, border-color 0.12s; }
+.brain-palette-ask.is-selected { background: color-mix(in srgb, var(--gold) 9%, var(--ink3)); border-left-color: var(--gold); }
+.brain-palette-ask-q { font-size: 14px; color: var(--t); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain-palette-ask-q strong { color: var(--gold2); font-weight: 700; }
+.brain-palette-body { padding: 16px 18px; max-height: min(60vh, 460px); overflow-y: auto; }
+.brain-palette-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+/* ── Panel «Cerebro» ── */
+.brain-page { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.brain-hero {
+  position: relative; overflow: hidden;
+  border-radius: var(--r4); border: 1px solid var(--bdr);
+  padding: 22px 22px 20px;
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--gold) 14%, transparent) 0%, transparent 55%),
+    radial-gradient(90% 120% at 0% 100%, color-mix(in srgb, var(--sky) 10%, transparent) 0%, transparent 60%),
+    var(--ink2);
+}
+.brain-hero h1 { font-family: var(--fh); font-weight: 400; font-size: clamp(30px, 5vw, 40px); line-height: 1.05; letter-spacing: -0.01em; color: var(--t); margin: 0; display: flex; align-items: center; gap: 12px; }
+.brain-hero p { font-size: 13.5px; color: var(--t2); margin: 8px 0 0; max-width: 620px; line-height: 1.55; }
+.brain-live { display: inline-flex; align-items: center; gap: 6px; font-family: var(--fb); font-size: 11px; font-weight: 600; color: var(--jade); }
+.brain-live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--jade); box-shadow: 0 0 10px var(--jade); animation: brain-pulse 1.8s ease-in-out infinite; }
+
+.brain-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.brain-stat { padding: 10px 12px; border-radius: var(--r2); background: color-mix(in srgb, var(--ink) 55%, transparent); border: 1px solid var(--bdr); min-width: 0; }
+.brain-stat b { display: block; font-size: 20px; font-weight: 800; color: var(--t); font-variant-numeric: tabular-nums; }
+.brain-stat span { font-size: 11px; color: var(--t3); }
+.brain-stat.is-alert b { color: var(--crim); }
+
+.brain-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 0; z-index: 2; padding: 10px 0; background: color-mix(in srgb, var(--ink) 88%, transparent); backdrop-filter: blur(8px); }
+.brain-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--ink3); border: 1px solid var(--bdr); overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+.brain-seg::-webkit-scrollbar { display: none; }
+.brain-seg button {
+  border: none; background: transparent; color: var(--t2); cursor: pointer;
+  font: 600 12px var(--fb); padding: 6px 12px; border-radius: 999px; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, color 0.15s;
+}
+.brain-seg button:hover { color: var(--t); }
+.brain-seg button[aria-pressed="true"] { background: var(--ink5); color: var(--t); box-shadow: var(--sh); }
+.brain-seg .brain-pill-dot { width: 7px; height: 7px; }
+.brain-seg-count { color: var(--t3); font-weight: 500; }
+.brain-filters select.form-input { width: auto; min-width: 180px; max-width: 100%; padding: 7px 10px; font-size: 12.5px; }
+.brain-filters-spacer { flex: 1; }
+
+.brain-list { display: flex; flex-direction: column; gap: 10px; }
+.brain-ev {
+  position: relative; border-radius: var(--r4); border: 1px solid var(--bdr);
+  background: var(--ink2); padding: 14px 16px 14px 18px;
+  transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+  animation: brain-rise 0.34s var(--ease-spring) both;
+}
+.brain-ev::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tone); opacity: 0.85; }
+.brain-ev:hover { border-color: var(--bdr2); transform: translateY(-1px); box-shadow: var(--sh); }
+.brain-ev.has-dropped { border-color: color-mix(in srgb, var(--crim) 38%, transparent); background: linear-gradient(90deg, color-mix(in srgb, var(--crim) 6%, var(--ink2)), var(--ink2) 60%); }
+.brain-ev-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.brain-ev-time { font-size: 12px; font-weight: 600; color: var(--t2); font-variant-numeric: tabular-nums; }
+.brain-ev-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--t3); min-width: 0; }
+.brain-ev-engine { font-family: var(--fm); font-size: 10.5px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain-ev-input { margin: 10px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--t); overflow-wrap: anywhere; white-space: pre-wrap; }
+.brain-ev-input.is-clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.brain-ev-input.is-empty { color: var(--t3); font-style: italic; }
+.brain-ev-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.brain-ev-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--t3); margin-right: 2px; }
+.brain-chip { display: inline-flex; align-items: center; gap: 5px; font: 600 11.5px var(--fm); padding: 3px 9px; border-radius: 7px; color: var(--t); background: var(--ink3); border: 1px solid var(--bdr2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain-chip.is-dropped { color: var(--crim); background: color-mix(in srgb, var(--crim) 10%, transparent); border-color: color-mix(in srgb, var(--crim) 35%, transparent); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--crim) 55%, transparent); }
+.brain-ev-detail { margin-top: 10px; font-size: 12.5px; line-height: 1.5; color: var(--t2); padding: 8px 10px; border-radius: var(--r); background: var(--ink3); border: 1px solid var(--bdr); overflow-wrap: anywhere; }
+.brain-ev-detail.is-err { color: var(--crim); background: color-mix(in srgb, var(--crim) 7%, var(--ink3)); border-color: color-mix(in srgb, var(--crim) 22%, transparent); }
+.brain-ev-toggle { margin-top: 8px; background: none; border: none; padding: 2px 0; cursor: pointer; color: var(--gold2); font: 600 11.5px var(--fb); }
+.brain-ev-more { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 8px; }
+.brain-kv { font-size: 11.5px; color: var(--t3); }
+.brain-kv b { color: var(--t2); font-weight: 600; }
+.brain-json { margin: 0; font: 11px/1.5 var(--fm); color: var(--t2); background: var(--ink); border: 1px solid var(--bdr); border-radius: var(--r); padding: 8px 10px; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.brain-more { display: flex; justify-content: center; padding: 6px 0 24px; }
+.brain-ev-skel { height: 104px; border-radius: var(--r4); border: 1px solid var(--bdr); background: linear-gradient(90deg, var(--ink2) 0%, var(--ink3) 50%, var(--ink2) 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+
+@media (max-width: 760px) {
+  .brain-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .brain-stats .brain-stat:first-child { grid-column: 1 / -1; }
+  .brain-hero { padding: 18px 16px; }
+  .brain-hero p { font-size: 13px; }
+  .brain-stat { padding: 8px 10px; }
+  .brain-stat b { font-size: 18px; }
+  .brain-filters { position: static; padding: 0; background: none; backdrop-filter: none; }
+  .brain-seg { display: flex; width: 100%; }
+  .brain-seg button { flex: 1 1 auto; justify-content: center; padding: 6px 8px; }
+  .brain-seg-count { display: none; }
+  .brain-ev { padding: 12px 12px 12px 15px; }
+  .brain-ev-meta { margin-left: 0; width: 100%; }
+  .brain-ev-engine { max-width: 60%; }
+  .brain-filters select.form-input { flex: 1 1 0; min-width: 0; }
+  .brain-filters-spacer { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-ev, .brain-answer { animation: none; }
+  .brain-ev:hover { transform: none; }
+}

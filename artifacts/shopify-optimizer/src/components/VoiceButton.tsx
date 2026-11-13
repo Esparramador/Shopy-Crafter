@@ -13,14 +13,20 @@ declare global {
   }
 }
 
-const EXECUTABLE_ACTIONS = [
-  "store_status", "list_products", "list_all_products", "create_product",
-  "edit_product", "change_price", "set_product_status", "regenerate_token",
-  "get_scopes", "delete_product", "search_product", "publish_product",
-  "get_orders", "scan_store", "search_suppliers", "modify_audit_filter",
-  "diagnose_app", "inspect_code", "fix_code", "list_source_files",
-  "analyze_component",
-];
+/**
+ * Respuesta de POST /api/voice/command (ShopyBrain, canal voice-button).
+ * `navigate` es la única acción del navegador; las demás vienen marcadas
+ * `executable` por el servidor (catálogo único) y se ejecutan con
+ * /api/voice/command/execute, que pide confirmación en las destructivas.
+ */
+interface VoiceAction { type: string; params?: Record<string, unknown>; executable?: boolean }
+interface VoiceCommandResponse {
+  response: string;
+  action: VoiceAction | null;
+  actions?: VoiceAction[];
+  executable?: boolean;
+  confidence: number;
+}
 
 function pickSpanishVoice(): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices();
@@ -146,7 +152,7 @@ export function VoiceButton() {
 
   const executeAction = async (actionType: string, params: Record<string, unknown>): Promise<string> => {
     try {
-      const res = await fetchBrainAction(`${API_BASE}/api/shopybrain/execute-action`, {
+      const res = await fetchBrainAction(`${API_BASE}/api/voice/command/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -180,7 +186,7 @@ export function VoiceButton() {
         credentials: "include",
         body: JSON.stringify({ transcript: text, currentPage: currentLocation, projectId: projectIdFromUrl }),
       });
-      const data = await res.json();
+      const data = await res.json() as VoiceCommandResponse;
       setResponse(data.response);
 
       speakSpanish(data.response);
@@ -189,16 +195,18 @@ export function VoiceButton() {
         detail: { transcript: text, response: data.response },
       }));
 
-      if (data.action?.type === "navigate" && data.action.params?.path) {
-        navigate(data.action.params.path);
-      } else if (data.action?.type && data.confidence >= 0.6 && EXECUTABLE_ACTIONS.includes(data.action.type)) {
+      const actions: VoiceAction[] = data.actions ?? (data.action ? [{ ...data.action, executable: data.executable }] : []);
+      const nav = actions.find(a => a.type === "navigate" && typeof a.params?.path === "string");
+      const exec = actions.find(a => a.type !== "navigate" && a.executable);
+      if (exec && data.confidence >= 0.6) {
         setActionResult("Ejecutando...");
-        const result = await executeAction(data.action.type, data.action.params || {});
+        const result = await executeAction(exec.type, exec.params || {});
         setActionResult(result);
 
-        const shortResult = result.length > 120 ? result.slice(0, 120) + "..." : result;
-        speakSpanish(shortResult);
+        const spoken = result.replace(/\*\*/g, "").replace(/`/g, "");
+        speakSpanish(spoken.length > 120 ? spoken.slice(0, 120) + "..." : spoken);
       }
+      if (nav) navigate(String(nav.params!.path));
     } catch {
       setResponse("Error al procesar el comando. Inténtalo de nuevo.");
     }

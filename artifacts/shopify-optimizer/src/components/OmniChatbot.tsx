@@ -19,6 +19,7 @@ import { getModelShortName } from "@/lib/model-aliases";
 import { activeChatModel, copyText, type TierMatrixLite } from "@/lib/active-model";
 import VoiceCallModal from "@/components/VoiceCallModal";
 import { fetchBrainAction } from "@/lib/brain-action";
+import { FALLBACK_ACTION_CATALOG, loadAdminActionCatalog } from "@/lib/brain-catalog";
 
 const API = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -1310,11 +1311,7 @@ Para CUALQUIER acción ejecutable (generar vídeo, crear producto, cambiar preci
 
 :::ACTION:::{"action":"nombre_accion","params":{...}}:::END_ACTION:::
 
-Acciones de vídeo disponibles desde el chat:
-- generate_video → Vídeo corto T2V/I2V. Params: {projectId, prompt (en inglés, cinematográfico), model? (default grok-imagine-video), duration? (5-10), aspect? (9:16|16:9|1:1), imageUrl?}
-- create_brand_ad → Anuncio de marca con escenas+voz+música. Params: {projectId, brand, productName, referenceImageVaultId, scenesCount?, videoModel?}
-- create_long_ad → Anuncio largo 3-20min. Params: {projectId, productId, totalDurationSec, scenesCount?}
-- create_montage_video → Montaje multicapa. Params: {projectId, ...}
+Usa solo acciones del catálogo de ShopyBrain (se añade al final de estas instrucciones), con sus params tal cual.
 
 ⛔ PROHIBICIONES ABSOLUTAS — VIOLACIÓN = ERROR CRÍTICO que destruye la confianza del usuario:
 1. NUNCA finjas haber generado un vídeo sin haber emitido el bloque :::ACTION:::
@@ -1499,6 +1496,16 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
   const chatSessionIdRef = useRef<string>(uuid());
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, open]);
+
+  // Catálogo de acciones del cerebro (GET /api/shopybrain/catalog?gate=admin), con respaldo.
+  // /search ya lo añade en el servidor; aquí hace falta para el streaming directo de Gemini.
+  const [actionCatalog, setActionCatalog] = useState<string>(FALLBACK_ACTION_CATALOG);
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    loadAdminActionCatalog().then(text => { if (!cancelled) setActionCatalog(text); });
+    return () => { cancelled = true; };
+  }, [open]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -3157,8 +3164,8 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
               ? `\nPlataforma del proyecto: ${activePlatform.icon} ${activePlatform.label} (${activePlatform.key}). Entidad: ${activePlatform.entityLabel}. Capacidades reales: ${activePlatform.capabilities.join(", ")}.\n${activePlatform.chatbotContext}\nNO ofrezcas acciones que la plataforma no soporta (p. ej. productos/temas Shopify en un proyecto Stripe).`
               : "";
             const geminiSysPrompt = geminiProjectId
-              ? `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nProyecto activo: projectId=${geminiProjectId} (número entero).${platformBlock}\nCuando emitas bloques :::ACTION::: usa SIEMPRE "projectId":${geminiProjectId} en los params.`
-              : `${SYSTEM_PROMPT}\n\n═══ CONTEXTO ACTIVO ═══\nNo hay ningún proyecto activo en esta sesión (ni Shopify, ni WooCommerce, ni PrestaShop, ni Stripe). Si el usuario pide generar vídeos, imágenes, auditorías, informes o cualquier acción que requiera projectId, usa projectId=0 en los params — el sistema creará automáticamente una carpeta "Shopy Crafter" donde se guardará todo lo generado.`;
+              ? `${SYSTEM_PROMPT}\n\n═══ CATÁLOGO DE ACCIONES ═══\n${actionCatalog}\n\n═══ CONTEXTO ACTIVO ═══\nProyecto activo: projectId=${geminiProjectId} (número entero).${platformBlock}\nCuando emitas bloques :::ACTION::: usa SIEMPRE "projectId":${geminiProjectId} en los params.`
+              : `${SYSTEM_PROMPT}\n\n═══ CATÁLOGO DE ACCIONES ═══\n${actionCatalog}\n\n═══ CONTEXTO ACTIVO ═══\nNo hay ningún proyecto activo en esta sesión (ni Shopify, ni WooCommerce, ni PrestaShop, ni Stripe). Si el usuario pide generar vídeos, imágenes, auditorías, informes o cualquier acción que requiera projectId, usa projectId=0 en los params — el sistema creará automáticamente una carpeta "Shopy Crafter" donde se guardará todo lo generado.`;
 
             let streamFailed = false;
             try {
@@ -3496,7 +3503,7 @@ Usa los botones de acciones rápidas ⬇️ o el 🎙 micrófono.`,
       abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, claudeModel, gptModel, nvidiaModel, location, activeModel.id]);
+  }, [input, loading, messages, attachFile, attachFiles, attachUrl, engineMode, claudeModel, gptModel, nvidiaModel, location, activeModel.id, actionCatalog]);
 
   // Prompt de un slash command que cambia de motor/modelo: se envía en el render
   // siguiente, cuando sendMessage ya ve el engineMode/nvidiaModel nuevos.

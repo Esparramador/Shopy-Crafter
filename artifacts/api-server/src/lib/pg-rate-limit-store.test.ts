@@ -51,8 +51,12 @@ describe("límite del formulario de contacto (PgRateLimitStore «contact»)", ()
   it("la ruta de contacto usa el cupo persistente y app.ts ya no cuenta antes de la ruta", async () => {
     const { readFile } = await import("node:fs/promises");
     const route = await readFile(new URL("../routes/contact.ts", import.meta.url), "utf8");
-    expect(route).toContain('createContactRateLimiter(new PgRateLimitStore("contact"))');
-    expect(route).toContain("() => checkContactRateLimit(req.ip");
+    // El cupo vive en lib/contact-lead.ts (lo comparten el formulario y ShopyBrain).
+    const lead = await readFile(new URL("./contact-lead.ts", import.meta.url), "utf8");
+    expect(lead).toContain('createContactRateLimiter(new PgRateLimitStore("contact"))');
+    expect(lead).toContain("() => checkContactRateLimit(opts.ip)");
+    expect(route).toContain('ip: req.ip ?? "unknown"');
+    expect(route).toContain("acceptContactLead(leadData");
     expect(route).not.toContain("contactRateMap");
     const app = await readFile(new URL("../app.ts", import.meta.url), "utf8");
     expect(app).not.toMatch(/app\.use\("\/api\/contact"/);

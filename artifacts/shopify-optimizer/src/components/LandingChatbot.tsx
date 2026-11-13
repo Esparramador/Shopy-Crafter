@@ -10,7 +10,12 @@ interface Message {
   content: string;
   retryText?: string;
   retryHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+  /** ShopyBrain abrió la solicitud del visitante (lead + Pre-Informe). */
+  leadOpened?: boolean;
 }
+
+/** La confirmación que añade el servidor al abrir el lead (routes/public-chat.ts). */
+const LEAD_OPENED_MARK = "He abierto tu solicitud";
 
 function uuid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
@@ -32,6 +37,7 @@ const SUGGESTIONS = [
   { icon: "⚙️", text: "¿Cómo funciona?" },
   { icon: "🆓", text: "¿Hay prueba gratuita?" },
   { icon: "🏪", text: "¿Para qué tipo de tiendas?" },
+  { icon: "📋", text: "Quiero un Pre-Informe gratis de mi tienda" },
 ];
 
 const WELCOME: Message = {
@@ -136,7 +142,7 @@ export default function LandingChatbot() {
 
     setMessages(m => m.map(msg => msg.id === botId
       ? completedReply
-        ? { ...msg, content: completedReply, retryText: undefined, retryHistory: undefined }
+        ? { ...msg, content: completedReply, leadOpened: completedReply.includes(LEAD_OPENED_MARK), retryText: undefined, retryHistory: undefined }
         : { ...msg, content: "No pude completar la respuesta. Comprueba tu conexión y vuelve a intentarlo.", retryText: content, retryHistory: history }
       : msg));
     setLoading(false);
@@ -287,6 +293,19 @@ export default function LandingChatbot() {
                 ) : (
                   <>
                     {formatText(msg.content)}
+                    {msg.leadOpened && (
+                      <div
+                        role="status"
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8,
+                          padding: "4px 10px", borderRadius: 999,
+                          border: "1px solid rgba(45,212,159,0.35)", background: "rgba(45,212,159,0.1)",
+                          color: "#2dd49f", fontSize: 11, fontWeight: 600,
+                        }}
+                      >
+                        Solicitud abierta · Pre-Informe en preparación
+                      </div>
+                    )}
                     {msg.retryText && !loading && (
                       <button
                         type="button"

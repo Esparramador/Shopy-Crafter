@@ -318,7 +318,8 @@ export function ClientChatbot({ onOpenChange }: { onOpenChange?: (open: boolean)
           setSavedIdxs(prev => { const s = new Set(prev); s.add(newIdx); return s; });
           addMsg({ role: "system", content: "📋 Guardado automáticamente en el Cuaderno IA", ts: Date.now() });
         }
-        if (d.forwarded) addMsg({ role: "system", content: "✅ Mensaje enviado al equipo de Shopy Crafter. Te responderán pronto.", ts: Date.now() });
+        // Si la petición la pasó ShopyBrain (request_team), la confirmación ya va en la respuesta.
+        if (d.forwarded && !d.teamRequest?.ok) addMsg({ role: "system", content: "✅ Mensaje enviado al equipo de Shopy Crafter. Te responderán pronto.", ts: Date.now() });
       } else {
         // ── SSE STREAMING path: general chat + deep research ────────────
         const botTs = Date.now();
