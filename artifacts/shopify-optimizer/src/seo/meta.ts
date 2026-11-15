@@ -234,6 +234,8 @@ export const SITE_LINK_GROUPS: { title: string; links: { href: string; label: st
     title: "Empresa",
     links: [
       { href: "/sobre-nosotros", label: "Sobre nosotros" },
+      { href: "/casos-de-exito", label: "Casos de éxito" },
+      { href: "/programa-de-afiliados", label: "Programa de afiliados" },
       { href: "/faq", label: "Preguntas frecuentes" },
       { href: "/contacto", label: "Contacto" },
       { href: "/changelog", label: "Novedades" },
