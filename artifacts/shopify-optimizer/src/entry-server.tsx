@@ -188,11 +188,63 @@ function linksHtml(): string {
   ).join("");
 }
 
+// ── Enlaces internos del HTML estático ────────────────────────────────────────
+// Search Console marcaba artículos y productos como «Descubierta: actualmente sin
+// indexar» y «Página de referencia: ninguna»: /blog no enlazaba ningún artículo y
+// /tienda solo los 6 productos del pie. Cada índice enlaza ahora todas sus páginas
+// indexables, y cada artículo y producto enlaza a sus hermanos.
+
+type LinkItem = { href: string; label: string; text?: string };
+
+function linkSection(title: string, items: LinkItem[]): string {
+  if (!items.length) return "";
+  return `<section><h2>${esc(title)}</h2><ul>${items.map(i =>
+    `<li><a href="${i.href}">${esc(i.label)}</a>${i.text ? ` — ${esc(i.text)}` : ""}</li>`).join("")}</ul></section>`;
+}
+
+/** Rutas indexables bajo un prefijo (las mismas que van al sitemap). */
+function indexable(prefix: string): SeoRoute[] {
+  return getSeoRoutes().filter(r => r.path.startsWith(prefix) && r.inSitemap && !r.noindex);
+}
+
+/** Artículos del blog, del más reciente al más antiguo. */
+function blogPosts(): SeoRoute[] {
+  return indexable("/blog/").sort((a, b) => (b.lastmod ?? "").localeCompare(a.lastmod ?? ""));
+}
+
+function shopProducts(): SeoRoute[] {
+  return indexable("/tienda/").filter(r => r.product);
+}
+
+const postItem = (r: SeoRoute): LinkItem => ({ href: r.path, label: r.h1, text: r.intro });
+const productItem = (r: SeoRoute): LinkItem => ({ href: r.path, label: r.h1, text: r.product?.category });
+
+function relatedProducts(route: SeoRoute, max = 8): SeoRoute[] {
+  const others = shopProducts().filter(r => r.path !== route.path);
+  const same = others.filter(r => r.product?.category === route.product?.category);
+  return [...same, ...others.filter(r => !same.includes(r))].slice(0, max);
+}
+
 function extraForRoute(route: SeoRoute): string {
   if (route.path === "/faq") return `<article>${FAQ_FLAT.map(f => `<h2>${esc(f.q)}</h2><p>${esc(f.a)}</p>`).join("")}</article>`;
+  if (route.path === "/blog") return linkSection("Artículos", blogPosts().map(postItem));
+  if (route.path === "/tienda") return linkSection("Productos y servicios", shopProducts().map(productItem));
+  if (route.path === "/changelog") {
+    return linkSection("Versiones", indexable("/changelog/").map(r => ({ href: r.path, label: r.h1, text: r.lastmod })));
+  }
+  if (route.path.startsWith("/blog/") && route.bodyHtml) {
+    return `<article style="line-height:1.7;color:#c9c7e0">${route.bodyHtml}</article>` +
+      linkSection("Más artículos del blog", blogPosts().filter(r => r.path !== route.path).map(r => ({ href: r.path, label: r.h1 })));
+  }
+  if (route.product && route.bodyHtml) {
+    return `<article style="line-height:1.7;color:#c9c7e0">${route.bodyHtml}</article>` +
+      linkSection("Más productos de la tienda", relatedProducts(route).map(productItem));
+  }
   if (route.bodyHtml) return `<article style="line-height:1.7;color:#c9c7e0">${route.bodyHtml}</article>`;
   if (route.path === "/") {
-    return `<ul>${SERVICES.map(([name, path]) => `<li><a href="${path}" style="color:#e6c668">${esc(name)}</a></li>`).join("")}</ul>`;
+    return `<ul>${SERVICES.map(([name, path]) => `<li><a href="${path}" style="color:#e6c668">${esc(name)}</a></li>`).join("")}</ul>` +
+      linkSection("Últimos artículos del blog", blogPosts().slice(0, 6).map(r => ({ href: r.path, label: r.h1 }))) +
+      linkSection("Tienda", shopProducts().map(r => ({ href: r.path, label: r.h1 })));
   }
   return "";
 }
